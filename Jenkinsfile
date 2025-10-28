@@ -42,7 +42,6 @@ pipeline {
                             -Dsonar.projectName=DevSecOps \
                             -Dsonar.projectVersion=1.0 \
                             -Dsonar.sources=. \
-                            -Dsonar.host.url=$SONARQUBE_HOST_URL \
                             -Dsonar.login=$SONARQUBE_TOKEN
                     '''
                     // Nếu muốn debug thêm, có thể thêm dòng dưới:
