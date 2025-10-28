@@ -1,20 +1,34 @@
 pipeline {
     agent any
+
     environment {
-        GIT_CREDENTIALS = credentials('github-token') // dùng ID ở bước trên
+        SONARQUBE = credentials('sonar-token')  // ID của token SonarQube bạn lưu trong Jenkins Credentials
     }
+
     stages {
-        stage('Clone Code') {
+        stage('Checkout Code') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/binh204/DevSecOps',
-                    credentialsId: 'github-token'
+                git branch: 'main', credentialsId: 'github-credentials', url: 'https://github.com/binh204/DevSecOps'
             }
         }
+
         stage('Build') {
             steps {
-                echo "Building project..."
-                // Thêm lệnh build nếu cần
+                echo 'Building project...'
+            }
+        }
+
+        stage('Code Analysis - SonarQube') {
+            steps {
+                withSonarQubeEnv('SonarQube') { // Tên server bạn thêm trong Jenkins → Manage Jenkins → Configure System
+                    sh 'sonar-scanner -Dproject.settings=sonar-project.properties'
+                }
+            }
+        }
+
+        stage('Post Build') {
+            steps {
+                echo 'Pipeline completed successfully!'
             }
         }
     }
