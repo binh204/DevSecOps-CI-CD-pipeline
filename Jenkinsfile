@@ -1,63 +1,67 @@
 pipeline {
-    agent any
+    agent any
 
-    options {
-        skipDefaultCheckout()
-    }
+    environment {
+        // Tên server phải đúng với tên bạn đặt trong:
+        // Manage Jenkins → Configure System → SonarQube servers
+        SONARQUBE_SERVER = 'SonarQube'
 
-    // Không cần khối 'tools'
+        // ID của Secret Text chứa token SonarQube (đã thêm trong Jenkins Credentials)
+        SONARQUBE_TOKEN = credentials('sonar-token')
+    }
 
-    stages {
-        stage('Checkout Code') {
-            steps {
-                echo '🌀 Cloning source code from GitHub...'
-                git(
-                    branch: 'main',
-                    credentialsId: 'github-credentials',
-                    url: 'https://github.com/binh204/DevSecOps.git'
-                )
-            }
-        }
+    stages {
 
-        stage('Build') {
-            steps {
-                echo '⚙️ Building the project...'
-                sh 'echo "Build process simulation - no errors."'
-            }
-        }
+        stage('Checkout Code') {
+            steps {
+                echo '🌀 Cloning source code from GitHub...'
+                git(
+                    branch: 'main',
+                    credentialsId: 'github-credentials',
+                    url: 'https://github.com/binh204/DevSecOps.git'
+                )
+            }
+        }
 
-        stage('SonarQube Analysis') {
-            steps {
-                echo '🔍 Starting SonarQube code analysis...'
-                
-                // *** ĐÂY LÀ SỬA LỖI MỚI NHẤT ***
-                // Tham số cho SERVER (từ Configure System)
-                // Tham số cho TOOL (từ Global Tools)
-                withSonarQubeEnv(configurationName: 'SonarQube', installationName: 'SonarQube') {
-                    
-                    // Jenkins sẽ tự động thêm scanner vào PATH
-                    sh """
-                        echo "Running SonarScanner..."
-                        sonar-scanner \
-                            -Dsonar.projectKey=DevSecOps \
-                            -Dsonar.projectName=DevSecOps \
-                            -Dsonar.projectVersion=1.0 \
-                            -Dsonar.sources=.
-                    """
-                }
-            }
-        }
-    }
+        stage('Build') {
+            steps {
+                echo '⚙️ Building the project...'
+                sh 'echo "Build process simulation - no errors."'
+            }
+        }
 
-    post {
-        success {
-            echo '✅ SonarQube analysis completed successfully!'
-        }
-        failure {
-            echo '❌ Pipeline failed! Check console output for details.'
-        }
-        always {
-            echo '🏁 Pipeline finished.'
-        }
-    }
+        stage('SonarQube Analysis') {
+            steps {
+                echo '🔍 Starting SonarQube code analysis...'
+                // Dùng đúng tên server bạn đã cấu hình
+                withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                    sh '''
+                        echo "Running SonarScanner..."
+                        sonar-scanner \
+                            -Dsonar.projectKey=DevSecOps \
+                            -Dsonar.projectName=DevSecOps \
+                            -Dsonar.projectVersion=1.0 \
+                            -Dsonar.sources=. \
+                            -Dsonar.login=$SONARQUBE_TOKEN
+                    '''
+                    // Nếu muốn debug thêm, có thể thêm dòng dưới:
+                    // sonar-scanner -X ...
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ SonarQube analysis completed successfully!'
+        }
+        failure {
+            echo '❌ Pipeline failed! Check console output for details.'
+        }
+        always {
+            echo '🏁 Pipeline finished.'
+        }
+    }
 }
+
+Sửa file Jenkins này 
