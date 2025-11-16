@@ -1,17 +1,16 @@
 pipeline {
-    agent any
+    agent any // Agent mặc định cho các stage không chỉ định agent riêng
 
-    environment {
-        // Tên server phải đúng với tên bạn đặt trong:
-        // Manage Jenkins → Configure System → SonarQube servers
-        SONARQUBE_SERVER = 'SonarQube'
-
-        // ID của Secret Text chứa token SonarQube (đã thêm trong Jenkins Credentials)
-        SONARQUBE_TOKEN = credentials('sonar-token')
+    // Tùy chọn: Tắt checkout SCM tự động. 
+    // Bằng cách này, stage 'Checkout Code' của bạn sẽ là bước checkout duy nhất.
+    options {
+        skipDefaultCheckout()
     }
 
-    stages {
+    // Không cần block 'environment' nữa, vì 'withSonarQubeEnv' 
+    // sẽ tự lấy thông tin (URL và token) từ tên server bạn cung cấp.
 
+    stages {
         stage('Checkout Code') {
             steps {
                 echo '🌀 Cloning source code from GitHub...'
@@ -31,21 +30,34 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
+            // *** ĐÂY LÀ SỬA LỖI CHÍNH ***
+            // Chỉ định stage này chạy trên một agent Docker riêng biệt
+            // Image này đã có sẵn 'sonar-scanner'
+            agent {
+                docker { 
+                    image 'sonarsource/sonar-scanner-cli:latest' 
+                    // Tùy chọn: cache các plugin của Sonar để chạy nhanh hơn ở lần sau
+                    args '-v $HOME/.sonar/cache:/root/.sonar/cache' 
+                }
+            }
             steps {
                 echo '🔍 Starting SonarQube code analysis...'
-                // Dùng đúng tên server bạn đã cấu hình
-                withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                
+                // Tên 'SonarQube' phải khớp với tên bạn đặt trong:
+                // Manage Jenkins → Configure System → SonarQube servers
+                withSonarQubeEnv('SonarQube') {
                     sh '''
                         echo "Running SonarScanner..."
+                        # Lệnh 'sonar-scanner' giờ sẽ được tìm thấy vì nó nằm trong Docker image
+                        #
+                        # Chúng ta đã XÓA -Dsonar.login=... vì 'withSonarQubeEnv'
+                        # đã tự động cung cấp token cho scanner một cách an toàn.
                         sonar-scanner \
                             -Dsonar.projectKey=DevSecOps \
                             -Dsonar.projectName=DevSecOps \
                             -Dsonar.projectVersion=1.0 \
-                            -Dsonar.sources=. \
-                            -Dsonar.login=$SONARQUBE_TOKEN
+                            -Dsonar.sources=.
                     '''
-                    // Nếu muốn debug thêm, có thể thêm dòng dưới:
-                    // sonar-scanner -X ...
                 }
             }
         }
