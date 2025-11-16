@@ -5,12 +5,10 @@ pipeline {
         skipDefaultCheckout()
     }
 
-    // *** THAY ĐỔI 1: KHAI BÁO TOOL ***
-    // Báo cho Jenkins biết pipeline này cần tool tên là 'SonarQube'.
-    // Tên 'SonarQube' này PHẢI KHỚP với tên bạn đặt trong ảnh chụp màn hình.
+    // *** THAY ĐỔI 1: SỬA LỖI TÊN TOOL TYPE ***
+    // Tên class đã được đổi thành tên ĐÚNG mà log lỗi cung cấp.
     tools {
-        // *** ĐÃ SỬA LỖI CÚ PHÁP: Thêm dấu ngoặc đơn () ***
-        org.sonarsource.scanner.jenkins.SonarQubeScannerInstallation('SonarQube')
+        hudson.plugins.sonar.SonarRunnerInstallation('SonarQube')
     }
 
     stages {
@@ -39,20 +37,22 @@ pipeline {
                 // 'SonarQube' này là tên SERVER (từ Configure System)
                 withSonarQubeEnv('SonarQube') {
                     
-                    // *** THAY ĐỔI 2: LẤY ĐƯỜNG DẪN ĐẦY ĐỦ ***
-                    
-                    // 1. Lấy đường dẫn cài đặt của tool tên là 'SonarQube' (từ Global Tools)
-                    def sqScanner = tool 'SonarQube'
-                    
-                    // 2. Chạy scanner bằng đường dẫn đầy đủ
-                    sh """
-                        echo "Running SonarScanner from path: ${sqScanner}/bin"
-                        ${sqScanner}/bin/sonar-scanner \
-                            -Dsonar.projectKey=DevSecOps \
-                            -Dsonar.projectName=DevSecOps \
-                            -Dsonar.projectVersion=1.0 \
-                            -Dsonar.sources=.
-                    """
+                    // *** THAY ĐỔI 2: SỬA LỖI CÚ PHÁP "def" ***
+                    // Bọc toàn bộ logic Groovy vào trong một khối 'script'
+                    script {
+                        // 1. Lấy đường dẫn cài đặt của tool tên là 'SonarQube' (từ Global Tools)
+                        def sqScanner = tool 'SonarQube'
+                        
+                        // 2. Chạy scanner bằng đường dẫn đầy đủ
+                        sh """
+                            echo "Running SonarScanner from path: ${sqScanner}/bin"
+                            ${sqScanner}/bin/sonar-scanner \
+                                -Dsonar.projectKey=DevSecOps \
+                                -Dsonar.projectName=DevSecOps \
+                                -Dsonar.projectVersion=1.0 \
+                                -Dsonar.sources=.
+                        """
+                    } // Kết thúc khối script
                 }
             }
         }
