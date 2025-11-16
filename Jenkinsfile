@@ -29,17 +29,18 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 echo '🔍 Starting SonarQube code analysis using Docker...'
-                sh '''
+                sh """
+                echo "Running SonarScanner Docker container..."
                 docker run --rm \
-                    -v $PWD:/usr/src \
+                    -v \$WORKSPACE:/usr/src \
                     -w /usr/src \
                     sonarsource/sonar-scanner-cli:latest \
                     -Dsonar.projectKey=DevSecOps \
                     -Dsonar.projectName=DevSecOps \
                     -Dsonar.projectVersion=1.0 \
                     -Dsonar.sources=. \
-                    -Dsonar.login=$SONARQUBE_TOKEN
-                '''
+                    -Dsonar.login=\$SONARQUBE_TOKEN
+                """
             }
         }
     }
