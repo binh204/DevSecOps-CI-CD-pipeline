@@ -1,9 +1,15 @@
 pipeline {
-    agent any // Chạy trên agent mặc định (chính là container Jenkins của bạn)
+    agent any
 
-    // Tùy chọn: Tắt checkout SCM tự động.
     options {
         skipDefaultCheckout()
+    }
+
+    // *** THAY ĐỔI 1: KHAI BÁO TOOL ***
+    // Báo cho Jenkins biết pipeline này cần tool tên là 'SonarQube'.
+    // Tên 'SonarQube' này PHẢI KHỚP với tên bạn đặt trong ảnh chụp màn hình.
+    tools {
+        org.sonarsource.scanner.jenkins.SonarQubeScannerInstallation 'SonarQube'
     }
 
     stages {
@@ -26,27 +32,26 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            // *** ĐÂY LÀ PHẦN ĐÃ SỬA ***
-            // Đã XÓA BỎ "agent { docker { ... } }"
-            // Jenkins sẽ chạy ngay trên agent mặc định (agent any)
             steps {
                 echo '🔍 Starting SonarQube code analysis...'
                 
-                // Tên 'SonarQube' phải khớp với tên bạn đặt trong:
-                // Manage Jenkins → Configure System → SonarQube servers
+                // 'SonarQube' này là tên SERVER (từ Configure System)
                 withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        echo "Running SonarScanner..."
-                        #
-                        # Lệnh 'sonar-scanner' này sẽ chạy được NẾU BẠN
-                        # đã làm bước cấu hình tool trong Jenkins.
-                        #
-                        sonar-scanner \
+                    
+                    // *** THAY ĐỔI 2: LẤY ĐƯỜNG DẪN ĐẦY ĐỦ ***
+                    
+                    // 1. Lấy đường dẫn cài đặt của tool tên là 'SonarQube' (từ Global Tools)
+                    def sqScanner = tool 'SonarQube'
+                    
+                    // 2. Chạy scanner bằng đường dẫn đầy đủ
+                    sh """
+                        echo "Running SonarScanner from path: ${sqScanner}/bin"
+                        ${sqScanner}/bin/sonar-scanner \
                             -Dsonar.projectKey=DevSecOps \
                             -Dsonar.projectName=DevSecOps \
                             -Dsonar.projectVersion=1.0 \
                             -Dsonar.sources=.
-                    '''
+                    """
                 }
             }
         }
