@@ -9,7 +9,8 @@ pipeline {
     // Báo cho Jenkins biết pipeline này cần tool tên là 'SonarQube'.
     // Tên 'SonarQube' này PHẢI KHỚP với tên bạn đặt trong ảnh chụp màn hình.
     tools {
-        org.sonarsource.scanner.jenkins.SonarQubeScannerInstallation 'SonarQube'
+        // *** ĐÃ SỬA LỖI CÚ PHÁP: Thêm dấu ngoặc đơn () ***
+        org.sonarsource.scanner.jenkins.SonarQubeScannerInstallation('SonarQube')
     }
 
     stages {
