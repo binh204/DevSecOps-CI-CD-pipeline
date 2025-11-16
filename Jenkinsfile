@@ -5,7 +5,7 @@ pipeline {
         skipDefaultCheckout()
     }
 
-    // XÓA BỎ khối 'tools' ở đây
+    // Không cần khối 'tools'
 
     stages {
         stage('Checkout Code') {
@@ -30,12 +30,11 @@ pipeline {
             steps {
                 echo '🔍 Starting SonarQube code analysis...'
                 
-                // *** ĐÂY LÀ SỬA LỖI CHÍNH ***
-                // Tên đầu tiên ('SonarQube') là tên SERVER (từ Configure System)
-                // Tham số 'installationName' là tên TOOL (từ Global Tools)
-                withSonarQubeEnv('SonarQube', installationName: 'SonarQube') {
+                // *** ĐÂY LÀ SỬA LỖI MỚI NHẤT ***
+                // Tham số cho SERVER (từ Configure System)
+                // Tham số cho TOOL (từ Global Tools)
+                withSonarQubeEnv(configurationName: 'SonarQube', installationName: 'SonarQube') {
                     
-                    // Không cần khối 'script' hay 'def' nữa
                     // Jenkins sẽ tự động thêm scanner vào PATH
                     sh """
                         echo "Running SonarScanner..."
