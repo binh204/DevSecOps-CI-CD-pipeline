@@ -28,18 +28,18 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                echo '🔍 Starting SonarQube code analysis...'
-                withSonarQubeEnv("${SONARQUBE_SERVER}") {
-                    sh '''
-                        echo "Running SonarScanner..."
-                        sonar-scanner \
-                            -Dsonar.projectKey=DevSecOps \
-                            -Dsonar.projectName=DevSecOps \
-                            -Dsonar.projectVersion=1.0 \
-                            -Dsonar.sources=. \
-                            -Dsonar.login=$SONARQUBE_TOKEN
-                    '''
-                }
+                echo '🔍 Starting SonarQube code analysis using Docker...'
+                sh '''
+                docker run --rm \
+                    -v $PWD:/usr/src \
+                    -w /usr/src \
+                    sonarsource/sonar-scanner-cli:latest \
+                    -Dsonar.projectKey=DevSecOps \
+                    -Dsonar.projectName=DevSecOps \
+                    -Dsonar.projectVersion=1.0 \
+                    -Dsonar.sources=. \
+                    -Dsonar.login=$SONARQUBE_TOKEN
+                '''
             }
         }
     }
