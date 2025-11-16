@@ -7,7 +7,11 @@ pipeline {
     }
 
     environment {
+        // Tên server phải đúng với tên bạn đặt trong:
+        // Manage Jenkins → Configure System → SonarQube servers
         SONARQUBE_SERVER = 'SonarQube'
+
+        // ID của Secret Text chứa token SonarQube (đã thêm trong Jenkins Credentials)
         SONARQUBE_TOKEN = credentials('sonar-token')
     }
 
@@ -34,8 +38,10 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 echo '🔍 Starting SonarQube code analysis...'
+                // Dùng đúng tên server bạn đã cấu hình
                 withSonarQubeEnv("${SONARQUBE_SERVER}") {
                     sh '''
+                        echo "Running SonarScanner..."
                         sonar-scanner \
                             -Dsonar.projectKey=DevSecOps \
                             -Dsonar.projectName=DevSecOps \
@@ -43,6 +49,8 @@ pipeline {
                             -Dsonar.sources=. \
                             -Dsonar.login=$SONARQUBE_TOKEN
                     '''
+                    // Nếu muốn debug thêm, có thể thêm dòng dưới:
+                    // sonar-scanner -X ...
                 }
             }
         }
