@@ -31,9 +31,9 @@ pipeline {
                 echo '🔍 Starting SonarQube code analysis...'
                 
                 // *** ĐÂY LÀ SỬA LỖI CHÍNH ***
-                // Chỉ định rõ ràng cả 'serverId' VÀ 'scannerName'
-                // Tên 'SonarQube' thứ hai phải khớp với tên tool bạn đặt trong Global Tools
-                withSonarQubeEnv(serverId: 'SonarQube', scannerName: 'SonarQube') {
+                // Tên đầu tiên ('SonarQube') là tên SERVER (từ Configure System)
+                // Tham số 'installationName' là tên TOOL (từ Global Tools)
+                withSonarQubeEnv('SonarQube', installationName: 'SonarQube') {
                     
                     // Không cần khối 'script' hay 'def' nữa
                     // Jenkins sẽ tự động thêm scanner vào PATH
