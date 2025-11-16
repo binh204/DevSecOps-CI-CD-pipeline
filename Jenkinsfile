@@ -1,21 +1,63 @@
 pipeline {
-    agent any
-    environment {
-        GIT_CREDENTIALS = credentials('github-token') // dùng ID ở bước trên
+    agent {
+        docker {
+            // Image chính thức của SonarScanner
+            image 'sonarsource/sonar-scanner-cli:latest'
+        }
     }
+
+    environment {
+        SONARQUBE_SERVER = 'SonarQube'
+        SONARQUBE_TOKEN = credentials('sonar-token')
+    }
+
     stages {
-        stage('Clone Code') {
+
+        stage('Checkout Code') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/binh204/DevSecOps',
-                    credentialsId: 'github-token'
+                echo '🌀 Cloning source code from GitHub...'
+                git(
+                    branch: 'main',
+                    credentialsId: 'github-credentials',
+                    url: 'https://github.com/binh204/DevSecOps.git'
+                )
             }
         }
+
         stage('Build') {
             steps {
-                echo "Building project..."
-                // Thêm lệnh build nếu cần
+                echo '⚙️ Building the project...'
+                sh 'echo "Build process simulation - no errors."'
             }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                echo '🔍 Starting SonarQube code analysis...'
+                withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                    sh '''
+                        sonar-scanner \
+                            -Dsonar.projectKey=DevSecOps \
+                            -Dsonar.projectName=DevSecOps \
+                            -Dsonar.projectVersion=1.0 \
+                            -Dsonar.sources=. \
+                            -Dsonar.login=$SONARQUBE_TOKEN
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ SonarQube analysis completed successfully!'
+        }
+        failure {
+            echo '❌ Pipeline failed! Check console output for details.'
+        }
+        always {
+            echo '🏁 Pipeline finished.'
         }
     }
 }
+
