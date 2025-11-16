@@ -1,14 +1,10 @@
 pipeline {
-    agent any // Agent mặc định cho các stage không chỉ định agent riêng
+    agent any // Chạy trên agent mặc định (chính là container Jenkins của bạn)
 
-    // Tùy chọn: Tắt checkout SCM tự động. 
-    // Bằng cách này, stage 'Checkout Code' của bạn sẽ là bước checkout duy nhất.
+    // Tùy chọn: Tắt checkout SCM tự động.
     options {
         skipDefaultCheckout()
     }
-
-    // Không cần block 'environment' nữa, vì 'withSonarQubeEnv' 
-    // sẽ tự lấy thông tin (URL và token) từ tên server bạn cung cấp.
 
     stages {
         stage('Checkout Code') {
@@ -30,16 +26,9 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            // *** ĐÂY LÀ SỬA LỖI CHÍNH ***
-            // Chỉ định stage này chạy trên một agent Docker riêng biệt
-            // Image này đã có sẵn 'sonar-scanner'
-            agent {
-                docker { 
-                    image 'sonarsource/sonar-scanner-cli:latest' 
-                    // Tùy chọn: cache các plugin của Sonar để chạy nhanh hơn ở lần sau
-                    args '-v $HOME/.sonar/cache:/root/.sonar/cache' 
-                }
-            }
+            // *** ĐÂY LÀ PHẦN ĐÃ SỬA ***
+            // Đã XÓA BỎ "agent { docker { ... } }"
+            // Jenkins sẽ chạy ngay trên agent mặc định (agent any)
             steps {
                 echo '🔍 Starting SonarQube code analysis...'
                 
@@ -48,10 +37,10 @@ pipeline {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
                         echo "Running SonarScanner..."
-                        # Lệnh 'sonar-scanner' giờ sẽ được tìm thấy vì nó nằm trong Docker image
                         #
-                        # Chúng ta đã XÓA -Dsonar.login=... vì 'withSonarQubeEnv'
-                        # đã tự động cung cấp token cho scanner một cách an toàn.
+                        # Lệnh 'sonar-scanner' này sẽ chạy được NẾU BẠN
+                        # đã làm bước cấu hình tool trong Jenkins.
+                        #
                         sonar-scanner \
                             -Dsonar.projectKey=DevSecOps \
                             -Dsonar.projectName=DevSecOps \
