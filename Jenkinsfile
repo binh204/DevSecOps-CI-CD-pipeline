@@ -2,10 +2,8 @@ pipeline {
     agent any
 
     environment {
-        // Tên server phải đúng với tên bạn đặt trong:
-        // Manage Jenkins → Configure System → SonarQube servers
+        // Tên server SonarQube đã cấu hình trong Jenkins
         SONARQUBE_SERVER = 'SonarQube'
-
         // ID của Secret Text chứa token SonarQube (đã thêm trong Jenkins Credentials)
         SONARQUBE_TOKEN = credentials('sonar-token')
     }
@@ -33,19 +31,28 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 echo '🔍 Starting SonarQube code analysis...'
-                // Dùng đúng tên server bạn đã cấu hình
+                
+                // Lấy đường dẫn SonarQube Scanner từ tool đã khai báo
+                def scannerHome = tool name: 'SonarScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                
                 withSonarQubeEnv("${SONARQUBE_SERVER}") {
-                    sh '''
+                    sh """
                         echo "Running SonarScanner..."
-                        sonar-scanner \
+                        ${scannerHome}/bin/sonar-scanner \
                             -Dsonar.projectKey=DevSecOps \
                             -Dsonar.projectName=DevSecOps \
                             -Dsonar.projectVersion=1.0 \
                             -Dsonar.sources=. \
-                            -Dsonar.login=$SONARQUBE_TOKEN
-                    '''
-                    // Nếu muốn debug thêm, có thể thêm dòng dưới:
-                    // sonar-scanner -X ...
+                            -Dsonar.login=${SONARQUBE_TOKEN}
+                    """
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 1, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
@@ -63,3 +70,4 @@ pipeline {
         }
     }
 }
+
