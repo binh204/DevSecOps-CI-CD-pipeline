@@ -34,7 +34,7 @@ pipeline {
             steps {
                 echo '🔍 Starting SonarQube code analysis...'
                 // Dùng đúng tên server bạn đã cấu hình
-                withSonarQubeEnv("$SonarQube") {
+                withSonarQubeEnv("SonarQube") {
                     sh '''
                         echo "Running SonarScanner..."
                         sonar-scanner \
@@ -42,7 +42,7 @@ pipeline {
                             -Dsonar.projectName=DevSecOps \
                             -Dsonar.projectVersion=1.0 \
                             -Dsonar.sources=. \
-                            -Dsonar.login=$SONARQUBE_TOKEN
+                            -Dsonar.login=sqa_c888b2c71a9edc4adafc33783560fa7cae646248
                     '''
                     // Nếu muốn debug thêm, có thể thêm dòng dưới:
                     // sonar-scanner -X ...
