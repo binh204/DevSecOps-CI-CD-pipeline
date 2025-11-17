@@ -33,7 +33,7 @@ pipeline {
                 script {
                     // Lấy đường dẫn SonarQube Scanner từ tool đã khai báo
                     def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-
+                    
                     withSonarQubeEnv("${SONARQUBE_SERVER}") {
                         sh """
                             echo "Running SonarScanner..."
@@ -57,3 +57,17 @@ pipeline {
             }
         }
     }
+
+    post {
+        success {
+            echo '✅ SonarQube analysis completed successfully!'
+        }
+        failure {
+            echo '❌ Pipeline failed! Check console output for details.'
+        }
+        always {
+            echo '🏁 Pipeline finished.'
+        }
+    }
+}
+
