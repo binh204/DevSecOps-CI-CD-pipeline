@@ -31,7 +31,6 @@ pipeline {
                 echo '🔍 Starting SonarQube code analysis...'
 
                 script {
-                    // Lấy đường dẫn SonarQube Scanner từ tool đã khai báo
                     def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
 
                     withSonarQubeEnv("${SONARQUBE_SERVER}") {
@@ -51,18 +50,39 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 1, unit: 'MINUTES'){
+                timeout(time: 1, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('OWASP ZAP Baseline Scan') {
+            steps {
+                echo '🛡️ Running OWASP ZAP Baseline Scan...'
+
+                sh '''
+                    docker run --rm -v $(pwd):/zap/wrk/ \
+                        owasp/zap2docker-stable zap-baseline.py \
+                        -t http://localhost:3000 \
+                        -r zap-report.html
+                '''
+            }
+        }
+
+        stage('Publish ZAP Report') {
+            steps {
+                echo '📄 Publishing OWASP ZAP Report...'
+                archiveArtifacts artifacts: 'zap-report.html', fingerprint: true
             }
         }
     }
-}
+
     post {
         success {
-            echo '✅ SonarQube analysis completed successfully!'
+            echo '✅ Pipeline completed successfully with SonarQube + ZAP!'
         }
         failure {
-            echo '❌ Pipeline failed! Check console output for details.'
+            echo '❌ Pipeline failed! Check console logs for details.'
         }
         always {
             echo '🏁 Pipeline finished.'
