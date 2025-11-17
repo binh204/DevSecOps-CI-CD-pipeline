@@ -1,15 +1,23 @@
 FROM jenkins/jenkins:lts
 
-# Cài Docker CLI
 USER root
+
+# Cài công cụ unzip
 RUN apt-get update && \
-    apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release && \
-    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
-    > /etc/apt/sources.list.d/docker.list && \
-    apt-get update && \
-    apt-get install -y docker-ce-cli && \
+    apt-get install -y unzip && \
     rm -rf /var/lib/apt/lists/*
+
+# Copy file Sonar Scanner vào container
+COPY sonar-scanner-cli-5.0.1.3006-linux.zip /tmp/
+
+# Giải nén và di chuyển vào /opt
+RUN unzip /tmp/sonar-scanner-cli-5.0.1.3006-linux.zip -d /opt/ && \
+    mv /opt/sonar-scanner-5.0.1.3006-linux /opt/sonar-scanner && \
+    rm /tmp/sonar-scanner-cli-5.0.1.3006-linux.zip
+
+# Thiết lập biến môi trường
+ENV SONAR_SCANNER_HOME=/opt/sonar-scanner
+ENV PATH=$SONAR_SCANNER_HOME/bin:$PATH
 
 USER jenkins
 

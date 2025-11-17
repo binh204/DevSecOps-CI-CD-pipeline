@@ -34,7 +34,7 @@ pipeline {
             steps {
                 echo '🔍 Starting SonarQube code analysis...'
                 // Dùng đúng tên server bạn đã cấu hình
-                withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                withSonarQubeEnv("$SonarQube") {
                     sh '''
                         echo "Running SonarScanner..."
                         sonar-scanner \
