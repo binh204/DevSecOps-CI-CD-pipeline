@@ -42,7 +42,7 @@ pipeline {
                                 -Dsonar.projectName=DevSecOps \
                                 -Dsonar.projectVersion=1.0 \
                                 -Dsonar.sources=. \
-                                -Dsonar.login=\$SONARQUBE_TOKEN
+                                -Dsonar.login=${SONARQUBE_TOKEN}
                         """
                     }
                 }
@@ -51,23 +51,9 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                timeout(time: 1, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
         }
     }
-
-    post {
-        success {
-            echo '✅ SonarQube analysis completed successfully!'
-        }
-        failure {
-            echo '❌ Pipeline failed! Check console output for details.'
-        }
-        always {
-            echo '🏁 Pipeline finished.'
-        }
-    }
-}
-
