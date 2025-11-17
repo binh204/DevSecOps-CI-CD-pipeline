@@ -42,6 +42,7 @@ pipeline {
                             -Dsonar.projectName=DevSecOps \
                             -Dsonar.projectVersion=1.0 \
                             -Dsonar.sources=. \
+                            -Dsonar.host.url=http://192.168.73.36:9000 \
                             -Dsonar.login=sqa_c888b2c71a9edc4adafc33783560fa7cae646248
                     '''
                     // Nếu muốn debug thêm, có thể thêm dòng dưới:
