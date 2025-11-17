@@ -32,7 +32,7 @@ pipeline {
 
                 script {
                     // Lấy đường dẫn SonarQube Scanner từ tool đã khai báo
-                    def scannerHome = tool name: 'SonarScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                    def scannerHome = tool name: 'SonaQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
                     
                     withSonarQubeEnv("${SONARQUBE_SERVER}") {
                         sh """
