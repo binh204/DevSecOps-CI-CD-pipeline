@@ -51,11 +51,12 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                    waitForQualityGate abortPipeline: false
+                timeout(time: 1, unit: 'MINUTES'){
+                    waitForQualityGate abortPipeline: true
             }
         }
     }
-
+}
     post {
         success {
             echo '✅ SonarQube analysis completed successfully!'
