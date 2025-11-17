@@ -32,7 +32,7 @@ pipeline {
 
                 script {
                     // Lấy đường dẫn SonarQube Scanner từ tool đã khai báo
-                    def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                    def scannerHome = tool name: 'SonarScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
 
                     withSonarQubeEnv("${SONARQUBE_SERVER}") {
                         sh """
@@ -42,7 +42,7 @@ pipeline {
                                 -Dsonar.projectName=DevSecOps \
                                 -Dsonar.projectVersion=1.0 \
                                 -Dsonar.sources=. \
-                                -Dsonar.login=${SONARQUBE_TOKEN}
+                                -Dsonar.login=\$SONARQUBE_TOKEN
                         """
                     }
                 }
@@ -51,7 +51,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 1, unit: 'MINUTES') {
+                timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -70,3 +70,4 @@ pipeline {
         }
     }
 }
+
