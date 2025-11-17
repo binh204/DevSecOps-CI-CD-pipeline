@@ -41,7 +41,7 @@ pipeline {
                                 -Dsonar.projectKey=DevSecOps \
                                 -Dsonar.projectName=DevSecOps \
                                 -Dsonar.projectVersion=1.0 \
-                                -Dsonar.sources=. \
+                                -Dsonar.sources=/home/binn204/juice-shop \
                                 -Dsonar.login=\$SONARQUBE_TOKEN
                         """
                     }
