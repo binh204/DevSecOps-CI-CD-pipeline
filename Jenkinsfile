@@ -71,18 +71,44 @@ stage('Quality Gate') {
             steps {
                 echo '🛡️ Running OWASP ZAP Baseline Scan...'
                 sh '''
-                    docker run --rm --network host -v $(pwd):/zap/wrk/ \
-                        owasp/zap2docker-stable zap-baseline.py \
-                        -t http://localhost:3000 \
-                        -r zap-report.html
+                    # Download ZAP baseline script
+                    wget -q https://raw.githubusercontent.com/zaproxy/zaproxy/main/docker/zap-baseline.py \
+                        -O zap-baseline.py
+                    chmod +x zap-baseline.py
+                    
+                    # Kiểm tra ZAP container có hoạt động không
+                    curl -f http://192.168.73.36:8082/ || { echo "❌ ZAP container not ready"; exit 1; }
+                    
+                    # Chạy scan sử dụng ZAP container có sẵn
+                    python3 zap-baseline.py \
+                        -t http://juice-shop-app:3000 \
+                        -r zap-report.html \
+                        -d http://zap:8080 \
+                        -I -j -a
+                    
+                    # Hoặc sử dụng host network
+                    # python3 zap-baseline.py \
+                    #     -t http://localhost:3000 \
+                    #     -r zap-report.html \ 
+                    #     -d http://192.168.73.36:8082 \
+                    #     -I -j -a
                 '''
             }
         }
 
         stage('Publish ZAP Report') {
             steps {
-                echo '📄 Publishing OWASP ZAP Report...'
+                echo '📄 Publishing ZAP Report...'
+                sh 'ls -la zap-report.html && echo "✅ ZAP report generated"'
                 archiveArtifacts artifacts: 'zap-report.html', fingerprint: true
+                publishHTML([
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: '.',
+                    reportFiles: 'zap-report.html',
+                    reportName: 'ZAP Security Report'
+                ])
             }
         }
 
