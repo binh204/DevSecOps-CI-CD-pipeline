@@ -30,25 +30,48 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                echo '🔍 Running SonarQube code analysis...'
-                script {
-                    def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-                    withSonarQubeEnv("${SONARQUBE_SERVER}") {
-                        sh """
-                            ${scannerHome}/bin/sonar-scanner \
-                                -Dsonar.projectKey=DevSecOps \
-                                -Dsonar.projectName=DevSecOps \
-                                -Dsonar.projectVersion=1.0 \
-                                -Dsonar.sources=juice-shop \
-                                -Dsonar.login=\$SONARQUBE_TOKEN
-                        """
-                    }
-                }
+        stage('SonarQube Analysis with Webhook') {
+    steps {
+        script {
+            def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+            withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                sh """
+                    ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=DevSecOps \
+                        -Dsonar.projectName=DevSecOps \
+                        -Dsonar.projectVersion=1.0 \
+                        -Dsonar.sources=juice-shop \
+                        -Dsonar.login=${SONARQUBE_TOKEN} \
+                        -Dsonar.qualitygate.wait=false
+                """
             }
         }
+    }
+}
 
+stage('Manual Quality Gate Check') {
+    steps {
+        echo '⏳ Waiting for analysis completion (manual check)...'
+        sleep time: 3, unit: 'MINUTES'
+        
+        script {
+            // Lấy task ID và kiểm tra thủ công
+            def taskId = sh(
+                script: 'cat .scannerwork/report-task.txt | grep ceTaskId | cut -d\\= -f2',
+                returnStdout: true
+            ).trim()
+            
+            echo "📊 Check SonarQube dashboard manually: http://192.168.73.36:9000/dashboard?id=DevSecOps"
+            echo "📋 Task ID: ${taskId}"
+            
+            // Hoặc sử dụng API để kiểm tra
+            sh """
+                echo "Checking analysis status via API..."
+                curl -s -u ${SONARQUBE_TOKEN}: "http://192.168.73.36:9000/api/qualitygates/project_status?projectKey=DevSecOps" | jq .
+            """
+        }
+    }
+}
         stage('Quality Gate') {
             steps {
                 script {
