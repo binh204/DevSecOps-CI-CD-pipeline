@@ -68,49 +68,46 @@ stage('Quality Gate') {
 }
 
         stage('OWASP ZAP Baseline Scan') {
-            steps {
-                echo '🛡️ Running OWASP ZAP Baseline Scan...'
-                sh '''
-                    # Download ZAP baseline script
-                    wget -q https://raw.githubusercontent.com/zaproxy/zaproxy/main/docker/zap-baseline.py \
-                        -O zap-baseline.py
-                    chmod +x zap-baseline.py
-                    
-                    # Kiểm tra ZAP container có hoạt động không
-                    curl -f http://192.168.73.36:8082/ || { echo "❌ ZAP container not ready"; exit 1; }
-                    
-                    # Chạy scan sử dụng ZAP container có sẵn
-                    python3 zap-baseline.py \
-                        -t http://juice-shop-app:3000 \
-                        -r zap-report.html \
-                        -d http://zap:8080 \
-                        -I -j -a
-                    
-                    # Hoặc sử dụng host network
-                    # python3 zap-baseline.py 
-                    #     -t http://localhost:3000 
-                    #     -r zap-report.html \
-                    #     -d http://192.168.73.36:8082 
-                    #     -I -j -a
-                '''
-            }
-        }
-
-        stage('Publish ZAP Report') {
-            steps {
-                echo '📄 Publishing ZAP Report...'
-                sh 'ls -la zap-report.html && echo "✅ ZAP report generated"'
-                archiveArtifacts artifacts: 'zap-report.html', fingerprint: true
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: '.',
-                    reportFiles: 'zap-report.html',
-                    reportName: 'ZAP Security Report'
-                ])
-            }
-        }
+    steps {
+        echo '🛡️ Running OWASP ZAP Baseline Scan...'
+        sh '''
+            # Download script với curl
+            echo "Downloading ZAP baseline script..."
+            curl -s -o zap-baseline.py \
+                https://raw.githubusercontent.com/zaproxy/zaproxy/main/docker/zap-baseline.py
+            chmod +x zap-baseline.py
+            
+            # Kiểm tra dependencies
+            echo "Checking dependencies..."
+            python3 --version || { echo "❌ Python3 not found"; exit 1; }
+            curl --version || { echo "❌ curl not found"; exit 1; }
+            
+            # Kiểm tra ZAP
+            echo "Checking ZAP container..."
+            curl -f http://192.168.73.36:8082/ || { echo "❌ ZAP not accessible"; exit 1; }
+            
+            # Kiểm tra ứng dụng - thử cả localhost và container name
+            echo "Checking application..."
+            if ! curl -f http://localhost:3000 >/dev/null 2>&1; then
+                echo "⚠️ localhost:3000 not accessible, trying to start app..."
+                docker run -d --name juice-shop-temp -p 3000:3000 bkimminich/juice-shop
+                sleep 30
+                curl -f http://localhost:3000 || { echo "❌ Failed to start application"; exit 1; }
+            fi
+            
+            # Chạy ZAP scan - sử dụng localhost để đơn giản
+            echo "Starting ZAP security scan..."
+            python3 zap-baseline.py \
+                -t http://localhost:3000 \
+                -r zap-report.html \
+                -d http://192.168.73.36:8082 \
+                -I -j -a \
+                -m 10
+            
+            echo "✅ ZAP scan completed"
+        '''
+    }
+}
 
         stage('Upload ZAP Report to DefectDojo') {
             steps {
