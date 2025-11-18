@@ -2,8 +2,12 @@ pipeline {
     agent any
 
     environment {
+        // Jenkins credentials
         SONARQUBE_SERVER = 'SonarQube'
         SONARQUBE_TOKEN = credentials('sonar-token')
+
+        // API key của DefectDojo (bạn lưu trong Jenkins Credentials)
+        DEFECTDOJO_API_KEY = credentials('defectdojo-api')
     }
 
     stages {
@@ -28,14 +32,13 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                echo '🔍 Starting SonarQube code analysis...'
+                echo '🔍 Running SonarQube code analysis...'
 
                 script {
                     def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
 
                     withSonarQubeEnv("${SONARQUBE_SERVER}") {
                         sh """
-                            echo "Running SonarScanner..."
                             ${scannerHome}/bin/sonar-scanner \
                                 -Dsonar.projectKey=DevSecOps \
                                 -Dsonar.projectName=DevSecOps \
@@ -63,7 +66,7 @@ pipeline {
                 sh '''
                     docker run --rm -v $(pwd):/zap/wrk/ \
                         owasp/zap2docker-stable zap-baseline.py \
-                        -t http://localhost:3000 \
+                        -t http://host.docker.internal:3000 \
                         -r zap-report.html
                 '''
             }
@@ -75,11 +78,28 @@ pipeline {
                 archiveArtifacts artifacts: 'zap-report.html', fingerprint: true
             }
         }
+
+        stage('Upload ZAP Report to DefectDojo') {
+            steps {
+                echo '🚀 Uploading ZAP scan results to DefectDojo...'
+
+                sh '''
+                    curl -X POST "http://192.168.73.36:8080/api/v2/import-scan/" \
+                        -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
+                        -F "file=@zap-report.html" \
+                        -F "scan_type=ZAP Scan" \
+                        -F "product=1" \
+                        -F "engagement=1" \
+                        -F "active=true" \
+                        -F "verified=false"
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo '✅ Pipeline completed successfully with SonarQube + ZAP!'
+            echo '✅ Pipeline completed successfully with SonarQube + ZAP + DefectDojo!'
         }
         failure {
             echo '❌ Pipeline failed! Check console logs for details.'
