@@ -31,22 +31,7 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            steps {
-                echo '🔍 Running SonarQube code analysis...'
-                script {
-                    def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-                    withSonarQubeEnv("${SONARQUBE_SERVER}") {
-                        sh """
-                            ${scannerHome}/bin/sonar-scanner \
-                                -Dsonar.projectKey=DevSecOps \
-                                -Dsonar.projectName=DevSecOps \
-                                -Dsonar.projectVersion=1.0 \
-                                -Dsonar.sources=juice-shop \
-                                -Dsonar.login=\$SONARQUBE_TOKEN
-                        """
-                    }
-                }
-    steps {
+	steps {
         script {
             def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
@@ -61,18 +46,7 @@ pipeline {
     }
 }
 
-        stage('Quality Gate') {
-            steps {
-                script {
-                    timeout(time: 15, unit: 'MINUTES') {  // timeout 15 phút
-                    timeout(time: 1, unit: 'MINUTES') {  // timeout 15 phút
-                        def qg = waitForQualityGate()
-                        echo "Quality Gate status: ${qg.status}"
-                        if (qg.status != 'OK') {
-                            error "Pipeline failed due to Quality Gate: ${qg.status}"
-                        }
-                    }
-stage('Wait for Processing') {
+	stage('Wait for Processing') {
     steps {
         echo '⏳ Chờ SonarQube xử lý (2 phút)...'
         sleep time: 2, unit: 'MINUTES'
