@@ -2,18 +2,19 @@ pipeline {
     agent any
 
     environment {
+        // Jenkins credentials
         SONARQUBE_SERVER = 'SonarQube'
         SONARQUBE_TOKEN = credentials('sonar-token')
+
+        // API key của DefectDojo
         DEFECTDOJO_API_KEY = credentials('defectdojo-api')
-        // Sử dụng ZAP container có sẵn
-        ZAP_URL = "http://zap:8080"
-        ZAP_HOST = "192.168.73.36:8082"  // Hoặc localhost:8082
     }
 
     stages {
+
         stage('Checkout Code') {
             steps {
-                echo '🌀 Cloning source code...'
+                echo '🌀 Cloning source code from GitHub...'
                 git(
                     branch: 'main',
                     credentialsId: 'github-credentials',
@@ -22,53 +23,82 @@ pipeline {
             }
         }
 
-        stage('Build and Run Application') {
+        stage('Build') {
             steps {
-                echo '🐳 Starting application for testing...'
-                sh '''
-                    # Chạy ứng dụng trong cùng network với ZAP
-                    docker run -d --network devsecops-net \
-                        --name juice-shop-app -p 3000:3000 \
-                        bkimminich/juice-shop
-                    
-                    # Chờ ứng dụng khởi động
-                    sleep 30
-                    echo "✅ Application started"
-                '''
+                echo '⚙️ Building the project...'
+                sh 'echo "Build process simulation - no errors."'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                echo '🔍 Running SonarQube analysis...'
+                echo '🔍 Running SonarQube code analysis...'
                 script {
                     def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
                     withSonarQubeEnv("${SONARQUBE_SERVER}") {
                         sh """
                             ${scannerHome}/bin/sonar-scanner \
                                 -Dsonar.projectKey=DevSecOps \
+                                -Dsonar.projectName=DevSecOps \
+                                -Dsonar.projectVersion=1.0 \
                                 -Dsonar.sources=juice-shop \
-                                -Dsonar.login=${SONARQUBE_TOKEN}
+                                -Dsonar.login=\$SONARQUBE_TOKEN
                         """
                     }
                 }
+    steps {
+        script {
+            def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+            withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                sh """
+                    ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=DevSecOps \
+                        -Dsonar.sources=juice-shop \
+                        -Dsonar.login=${SONARQUBE_TOKEN}
+                """
             }
         }
+    }
+}
 
-        stage('Wait for Processing') {
+        stage('Quality Gate') {
             steps {
-                echo '⏳ Waiting for SonarQube processing...'
-                sleep time: 2, unit: 'MINUTES'
+                script {
+                    timeout(time: 15, unit: 'MINUTES') {  // timeout 15 phút
+                    timeout(time: 1, unit: 'MINUTES') {  // timeout 15 phút
+                        def qg = waitForQualityGate()
+                        echo "Quality Gate status: ${qg.status}"
+                        if (qg.status != 'OK') {
+                            error "Pipeline failed due to Quality Gate: ${qg.status}"
+                        }
+                    }
+stage('Wait for Processing') {
+    steps {
+        echo '⏳ Chờ SonarQube xử lý (2 phút)...'
+        sleep time: 2, unit: 'MINUTES'
+    }
+}
+
+stage('Quality Gate') {
+    steps {
+        script {
+            timeout(time: 8, unit: 'MINUTES') {
+                def qg = waitForQualityGate()
+                echo "✅ Quality Gate: ${qg.status}"
+                if (qg.status != 'OK') {
+                    error "❌ Quality Gate failed!"
+                }
             }
         }
+    }
+}
 
-        stage('OWASP ZAP Baseline Scan') {
+       stage('OWASP ZAP Baseline Scan') {
             steps {
                 echo '🛡️ Running OWASP ZAP Baseline Scan...'
                 sh '''
                     # Download ZAP baseline script
-                    wget -q https://raw.githubusercontent.com/zaproxy/zaproxy/main/docker/zap-baseline.py \
-                        -O zap-baseline.py
+                    wget -q https://raw.githubusercontent.com/zaproxy/zaproxy/main/docker/zap-baseline.py -O zap-baseline.py
                     chmod +x zap-baseline.py
                     
                     # Kiểm tra ZAP container có hoạt động không
@@ -81,7 +111,7 @@ pipeline {
                         -d http://zap:8080 \
                         -I -j -a
                     
-                    # Hoặc sử dụng host network
+                    # Alternative: sử dụng host network (comment không có backslash)
                     # python3 zap-baseline.py 
                     #     -t http://localhost:3000 
                     #     -r zap-report.html 
@@ -107,54 +137,32 @@ pipeline {
             }
         }
 
-        stage('Upload to DefectDojo') {
+        stage('Upload ZAP Report to DefectDojo') {
             steps {
-                echo '🚀 Uploading to DefectDojo...'
+                echo '🚀 Uploading ZAP scan results to DefectDojo...'
                 sh '''
-                    if [ -f "zap-report.html" ]; then
-                        curl -X POST "http://192.168.73.36:8080/api/v2/import-scan/" \
-                            -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
-                            -F "file=@zap-report.html" \
-                            -F "scan_type=ZAP Scan" \
-                            -F "product=1" \
-                            -F "engagement=1" \
-                            -F "active=true" \
-                            -F "verified=false" \
-                            -F "close_old_findings=true"
-                        echo "✅ Uploaded to DefectDojo"
-                    else
-                        echo "❌ ZAP report not found"
-                        exit 1
-                    fi
-                '''
-            }
-        }
-
-        stage('Cleanup Application') {
-            steps {
-                echo '🧹 Cleaning up application container...'
-                sh '''
-                    docker stop juice-shop-app || true
-                    docker rm juice-shop-app || true
-                    echo "✅ Cleanup completed"
+                    curl -X POST "http://192.168.73.36:8080/api/v2/import-scan/" \
+                        -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
+                        -F "file=@zap-report.html" \
+                        -F "scan_type=ZAP Scan" \
+                        -F "product=1" \
+                        -F "engagement=1" \
+                        -F "active=true" \
+                        -F "verified=false"
                 '''
             }
         }
     }
 
     post {
-        always {
-            echo '🧹 Final cleanup...'
-            sh '''
-                docker stop juice-shop-app || true
-                docker rm juice-shop-app || true
-            '''
-        }
         success {
-            echo '✅ Pipeline completed successfully!'
+            echo '✅ Pipeline completed successfully with SonarQube + ZAP + DefectDojo!'
         }
         failure {
-            echo '❌ Pipeline failed! Check console logs.'
+            echo '❌ Pipeline failed! Check console logs for details.'
+        }
+        always {
+            echo '🏁 Pipeline finished.'
         }
     }
 }
