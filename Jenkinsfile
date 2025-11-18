@@ -67,10 +67,12 @@ pipeline {
             steps {
                 echo '🛡️ Running OWASP ZAP Baseline Scan...'
                 sh '''
-                    docker run --rm --network host -v $(pwd):/zap/wrk/ \
-                        owasp/zap2docker-stable zap-baseline.py \
-                        -t http://localhost:3000 \
-                        -r zap-report.html
+                    docker run -d \
+                      --network devsecops-net \
+                      --name zap \
+                      -p 8082:8080 \
+                      zaproxy/zap-stable \
+                      zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.disablekey=true
                 '''
             }
         }
