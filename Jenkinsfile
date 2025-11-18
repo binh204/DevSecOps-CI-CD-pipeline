@@ -6,7 +6,7 @@ pipeline {
         SONARQUBE_SERVER = 'SonarQube'
         SONARQUBE_TOKEN = credentials('sonar-token')
 
-        // API key của DefectDojo (bạn lưu trong Jenkins Credentials)
+        // API key của DefectDojo
         DEFECTDOJO_API_KEY = credentials('defectdojo-api')
     }
 
@@ -33,10 +33,8 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 echo '🔍 Running SonarQube code analysis...'
-
                 script {
                     def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-
                     withSonarQubeEnv("${SONARQUBE_SERVER}") {
                         sh """
                             ${scannerHome}/bin/sonar-scanner \
@@ -53,19 +51,25 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                    waitForQualityGate abortPipeline: false
+                script {
+                    timeout(time: 15, unit: 'MINUTES') {  // timeout 15 phút
+                        def qg = waitForQualityGate()
+                        echo "Quality Gate status: ${qg.status}"
+                        if (qg.status != 'OK') {
+                            error "Pipeline failed due to Quality Gate: ${qg.status}"
+                        }
+                    }
                 }
             }
-        
+        }
 
         stage('OWASP ZAP Baseline Scan') {
             steps {
                 echo '🛡️ Running OWASP ZAP Baseline Scan...'
-
                 sh '''
-                    docker run --rm -v $(pwd):/zap/wrk/ \
+                    docker run --rm --network host -v $(pwd):/zap/wrk/ \
                         owasp/zap2docker-stable zap-baseline.py \
-                        -t http://host.docker.internal:3000 \
+                        -t http://localhost:3000 \
                         -r zap-report.html
                 '''
             }
@@ -81,7 +85,6 @@ pipeline {
         stage('Upload ZAP Report to DefectDojo') {
             steps {
                 echo '🚀 Uploading ZAP scan results to DefectDojo...'
-
                 sh '''
                     curl -X POST "http://192.168.73.36:8080/api/v2/import-scan/" \
                         -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
