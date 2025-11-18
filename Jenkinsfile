@@ -52,7 +52,7 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 script {
-                    timeout(time: 15, unit: 'MINUTES') {  // timeout 15 phút
+                    timeout(time: 1, unit: 'MINUTES') {  // timeout 15 phút
                         def qg = waitForQualityGate()
                         echo "Quality Gate status: ${qg.status}"
                         if (qg.status != 'OK') {
