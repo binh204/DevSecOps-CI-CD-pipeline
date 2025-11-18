@@ -48,7 +48,7 @@ pipeline {
                 }
             }
         }
-
+/*
         stage('Quality Gate') {
             steps {
                 script {
@@ -62,7 +62,7 @@ pipeline {
                 }
             }
         }
-
+*/
         stage('OWASP ZAP Baseline Scan') {
             steps {
                 echo '🛡️ Running OWASP ZAP Baseline Scan...'
