@@ -48,6 +48,7 @@ pipeline {
                 }
             }
         }
+
 /*
         stage('Quality Gate') {
             steps {
@@ -62,16 +63,16 @@ pipeline {
                 }
             }
         }
+
 */
         stage('OWASP ZAP Baseline Scan') {
             steps {
                 echo '🛡️ Running OWASP ZAP Baseline Scan...'
                 sh '''
-                    python3 /path/to/zap-baseline.py \
-                      -t http://app:3000 \
-                      -r zap-report.html \
-                      -p 8080 \
-                      -d http://zap:8080
+                    docker run --rm --network host -v $(pwd):/zap/wrk/ \
+                        owasp/zap2docker-stable zap-baseline.py \
+                        -t http://localhost:3000 \
+                        -r zap-report.html
                 '''
             }
         }
@@ -112,4 +113,3 @@ pipeline {
         }
     }
 }
-
