@@ -82,10 +82,10 @@ pipeline {
                         -I -j -a
                     
                     # Hoặc sử dụng host network
-                    # python3 zap-baseline.py \
-                    #     -t http://localhost:3000 \
-                    #     -r zap-report.html \ 
-                    #     -d http://192.168.73.36:8082 \
+                    # python3 zap-baseline.py 
+                    #     -t http://localhost:3000 
+                    #     -r zap-report.html 
+                    #     -d http://192.168.73.36:8082 
                     #     -I -j -a
                 '''
             }
