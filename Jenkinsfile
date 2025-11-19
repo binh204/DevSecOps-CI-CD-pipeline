@@ -37,6 +37,20 @@ pipeline {
             steps { sleep time: 2, unit: 'MINUTES' }
         }
 
+        stage('Quality Gate') {
+            steps {
+                script {
+                    timeout(time: 8, unit: 'MINUTES') {
+                        def qg = waitForQualityGate()
+                        echo "✅ Quality Gate: ${qg.status}"
+                        if (qg.status != 'OK') {
+                            error "❌ Quality Gate failed!"
+                        }
+                    }
+                }
+            }
+        }
+
         // 4️⃣ Build Docker image từ source code
         stage('Build Docker Image') {
     steps {
