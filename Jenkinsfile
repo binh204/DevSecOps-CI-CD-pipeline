@@ -49,7 +49,7 @@ pipeline {
             )
         }
     }
-
+}
         // 5️⃣ Run container từ image vừa build
         stage('Run Juice Shop Container') {
             steps {
