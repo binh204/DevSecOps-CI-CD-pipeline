@@ -39,13 +39,16 @@ pipeline {
 
         // 4️⃣ Build Docker image từ source code
         stage('Build Docker Image') {
-            steps {
-                script {
-                    echo "🚀 Building Docker image from source..."
-                    dockerImage = docker.build("juice-shop:${BUILD_NUMBER}", "juice-shop")
-                }
-            }
+    steps {
+        script {
+            echo "🚀 Building Docker image from Juice Shop source..."
+
+            dockerImage = docker.build(
+                "juice-shop:${env.BUILD_NUMBER}",
+                "./juice-shop"   // <-- Build đúng thư mục chứa Dockerfile
+            )
         }
+    }
 
         // 5️⃣ Run container từ image vừa build
         stage('Run Juice Shop Container') {
