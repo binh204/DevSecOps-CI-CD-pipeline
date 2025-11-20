@@ -1,16 +1,24 @@
 pipeline {
     agent any
+
     environment {
         SONARQUBE_SERVER = 'SonarQube'
+        SONAR_HOST = 'http://192.168.73.36:9000'
+        PROJECT_KEY = 'DevSecOps'
+
         SONARQUBE_TOKEN = credentials('sonar-token')
         DEFECTDOJO_API_KEY = credentials('defectdojo-api')
+
+        DEFECTDOJO_URL = 'http://192.168.73.36:8080'
+        DEFECTDOJO_ENGAGEMENT_ID = '1'
     }
 
     stages {
+
         // 1️⃣ Checkout code
         stage('Checkout') {
             steps {
-                git branch: 'main', credentialsId: 'github-credentials', 
+                git branch: 'main', credentialsId: 'github-credentials',
                     url: 'https://github.com/binh204/DevSecOps'
             }
         }
@@ -23,7 +31,7 @@ pipeline {
                     withSonarQubeEnv("${SONARQUBE_SERVER}") {
                         sh """
                             ${scannerHome}/bin/sonar-scanner \
-                                -Dsonar.projectKey=DevSecOps \
+                                -Dsonar.projectKey=${PROJECT_KEY} \
                                 -Dsonar.sources=. \
                                 -Dsonar.login=${SONARQUBE_TOKEN}
                         """
@@ -32,18 +40,21 @@ pipeline {
             }
         }
 
-        // 3️⃣ Wait for SonarQube processing
+        // 3️⃣ Wait for SonarQube
         stage('Wait for Processing') {
-            steps { sleep time: 2, unit: 'MINUTES' }
+            steps {
+                sleep time: 2, unit: 'MINUTES'
+            }
         }
 
+        // 4️⃣ Quality Gate
         stage('Quality Gate') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     script {
                         timeout(time: 8, unit: 'MINUTES') {
-                        def qg = waitForQualityGate()
-                        echo "✅ Quality Gate: ${qg.status}"
+                            def qg = waitForQualityGate()
+                            echo "✅ Quality Gate: ${qg.status}"
                             if (qg.status != 'OK') {
                                 error "❌ Quality Gate failed!"
                             }
@@ -53,21 +64,78 @@ pipeline {
             }
         }
 
+        // 5️⃣ Trivy SCAN using Docker container (ephemeral)
+        stage('Trivy Source Scan') {
+            steps {
+                script {
+                    sh '''
+                        echo "🚀 Running Trivy container to scan source code..."
 
-        // 4️⃣ Build Docker image từ source code
-        stage('Build Docker Image') {
-    steps {
-        script {
-            echo "🚀 Building Docker image from Juice Shop source..."
+                        docker run --rm \
+                            -v $(pwd)/juice-shop:/project \
+                            -v $(pwd):/output \
+                            aquasec/trivy:latest \
+                            fs /project \
+                            --format json \
+                            --output /output/trivy-report.json || true
+                    '''
 
-            dockerImage = docker.build(
-                "juice-shop:${env.BUILD_NUMBER}",
-                "./juice-shop"   // <-- Build đúng thư mục chứa Dockerfile
-            )
+                    echo "📄 Trivy report generated: trivy-report.json"
+                }
+            }
         }
-    }
-}
-        // 5️⃣ Run container từ image vừa build
+
+        // 6️⃣ Export Sonar → DefectDojo
+        stage('Upload Sonar Report to DefectDojo') {
+            steps {
+                script {
+                    sh """
+                        curl -u ${SONARQUBE_TOKEN}: \
+                        "${SONAR_HOST}/api/issues/search?projectKeys=${PROJECT_KEY}&ps=500" \
+                        -o sonar-report.json
+                    """
+
+                    sh """
+                        curl -X POST "${DEFECTDOJO_URL}/api/v2/import-scan/" \
+                            -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
+                            -F "scan_type=SonarQube Scan" \
+                            -F "engagement=${DEFECTDOJO_ENGAGEMENT_ID}" \
+                            -F "file=@sonar-report.json"
+                    """
+                }
+            }
+        }
+
+        // 7️⃣ Upload Trivy → DefectDojo
+        stage('Upload Trivy Report to DefectDojo') {
+            steps {
+                script {
+                    sh """
+                        curl -X POST "${DEFECTDOJO_URL}/api/v2/import-scan/" \
+                            -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
+                            -F "scan_type=Trivy Scan" \
+                            -F "engagement=${DEFECTDOJO_ENGAGEMENT_ID}" \
+                            -F "file=@trivy-report.json"
+                    """
+                }
+            }
+        }
+
+        // 8️⃣ Build Docker image
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo "🚀 Building Docker image from Juice Shop source..."
+
+                    dockerImage = docker.build(
+                        "juice-shop:${env.BUILD_NUMBER}",
+                        "./juice-shop"
+                    )
+                }
+            }
+        }
+
+        // 9️⃣ Run container
         stage('Run Juice Shop Container') {
             steps {
                 script {
@@ -77,57 +145,15 @@ pipeline {
                         docker rm juice-app || true
                     '''
                     sh "docker run -d --name juice-app -p 3000:3000 juice-shop:${BUILD_NUMBER}"
-                    sleep 25 // đợi container sẵn sàng
+                    sleep 25
                 }
             }
         }
 
-/*
-        // 6️⃣ ZAP Security Scan
-        stage('ZAP Security Scan') {
-            steps {
-                sh '''
-                    python3 zap-baseline.py \
-                        -t http://localhost:3000 \
-                        -r zap-report.html \
-                        -d http://192.168.73.36:8082 \
-                        -I -j
-                '''
-            }
-        }
-
-        // 7️⃣ Publish ZAP report
-        stage('Publish Reports') {
-            steps {
-                archiveArtifacts artifacts: 'zap-report.html', fingerprint: true
-                publishHTML([
-                    allowMissing: false, reportDir: '.', 
-                    reportFiles: 'zap-report.html', reportName: 'ZAP Security Report'
-                ])
-            }
-        }
-
-        // 8️⃣ Upload to DefectDojo
-        stage('Upload to DefectDojo') {
-            steps {
-                sh '''
-                    if [ -f "zap-report.html" ]; then
-                        curl -X POST "http://192.168.73.36:8080/api/v2/import-scan/" \
-                            -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
-                            -F "file=@zap-report.html" \
-                            -F "scan_type=ZAP Scan" \
-                            -F "product=1" -F "engagement=1" \
-                            -F "active=true" -F "verified=false"
-                    fi
-                '''
-            }
-        }
-*/
-    }
+    } // end stages
 
     post {
         success { echo '✅ Pipeline completed successfully!' }
         failure { echo '❌ Pipeline failed!' }
     }
 }
-
