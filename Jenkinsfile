@@ -63,10 +63,10 @@ pipeline {
         }
 
         // 5️⃣ Trivy scan (ephemeral container)
-        stage('Trivy FS Scan') {
+        stage('Trivy FS Scan & Upload') {
     steps {
         script {
-            sh '''
+            sh """
                 echo "📁 Current workspace: ${WORKSPACE}"
                 echo "Checking juice-shop directory..."
                 ls -la ${WORKSPACE}/juice-shop || echo "❌ Directory not found"
@@ -74,7 +74,8 @@ pipeline {
                 echo "🛡 Running Trivy scan..."
                 docker run --rm \
                     -v ${WORKSPACE}:/app \
-                    -u $(id -u):$(id -g) \
+                    -v ${WORKSPACE}/.trivy-cache:/root/.cache/trivy \
+                    -u \$(id -u):\$(id -g) \
                     aquasec/trivy:latest fs /app/juice-shop \
                     --format json \
                     --output /app/trivy-report.json \
@@ -83,15 +84,32 @@ pipeline {
                 if [ -f "${WORKSPACE}/trivy-report.json" ]; then
                     echo "✅ Trivy report created successfully!"
                     ls -la ${WORKSPACE}/trivy-report.json
+
+                    echo "📤 Uploading Trivy report to DefectDojo..."
+                    RESPONSE=\$(curl -s -w "%{http_code}" -o /tmp/trivy_upload.log -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
+                        -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                        -F 'scan_type=Trivy Scan' \
+                        -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                        -F 'file=@${WORKSPACE}/trivy-report.json')
+
+                    if [ "\$RESPONSE" == "201" ] || [ "\$RESPONSE" == "200" ]; then
+                        echo "✅ Trivy report uploaded successfully!"
+                    else
+                        echo "❌ Failed to upload Trivy report, HTTP code: \$RESPONSE"
+                        echo "Response body:"
+                        cat /tmp/trivy_upload.log
+                    fi
+
                 else
                     echo "❌ Trivy report not created!"
                     echo "Displaying Trivy output in table format for debugging..."
                     docker run --rm -v ${WORKSPACE}:/app aquasec/trivy:latest fs /app/juice-shop --format table
                 fi
-            '''
+            """
         }
     }
 }
+
 
 
         
