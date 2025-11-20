@@ -71,7 +71,8 @@ pipeline {
                             -v ${WORKSPACE}:/app \
                             aquasec/trivy:latest fs /app/juice-shop \
                             --format json \
-                            --output /app/trivy-report.json || true
+                            --output /app/trivy-report.json \
+                            --debug
                     """
                     echo "📄 Trivy report generated: ${WORKSPACE}/trivy-report.json"
                 }
@@ -82,6 +83,7 @@ pipeline {
         stage('Upload Sonar Report to DefectDojo') {
             steps {
                 script {
+                    echo "📄 SonarQube upload report to DefectDojo......."
                     sh """
                         curl -s -u '${SONARQUBE_TOKEN}:' \
                         '${SONAR_HOST}/api/issues/search?projectKeys=${PROJECT_KEY}&ps=500' \
@@ -95,7 +97,6 @@ pipeline {
                         -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
                         -F 'file=@${WORKSPACE}/sonar-report.json'
                     """
-                    echo "📄 SonarQube upload report to DefectDojo......."
                 }
             }
         }
@@ -104,6 +105,7 @@ pipeline {
         stage('Upload Trivy Report to DefectDojo') {
             steps {
                 script {
+                    echo "📄 Trivy upload report to DefectDojo......."
                     sh """
                         curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
                         -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
@@ -111,7 +113,6 @@ pipeline {
                         -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
                         -F 'file=@${WORKSPACE}/trivy-report.json'
                     """
-                     echo "📄 Trivy upload report to DefectDojo......."
                 }
             }
         }
