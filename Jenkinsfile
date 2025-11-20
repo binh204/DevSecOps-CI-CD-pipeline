@@ -64,19 +64,37 @@ pipeline {
 
         // 5️⃣ Trivy scan (ephemeral container)
         stage('Trivy FS Scan') {
-            steps {
-                script {
-                    sh """
-                        docker run --rm \
-                            -v ${WORKSPACE}:/app \
-                            aquasec/trivy:latest fs /app/juice-shop \
-                            --format json \
-                            --output /app/trivy-report.json || true
-                    """
-                    echo "📄 Trivy report generated: ${WORKSPACE}/trivy-report.json"
-                }
-            }
+    steps {
+        script {
+            sh '''
+                echo "📁 Current workspace: ${WORKSPACE}"
+                echo "Checking juice-shop directory..."
+                ls -la ${WORKSPACE}/juice-shop || echo "❌ Directory not found"
+
+                echo "🛡 Running Trivy scan..."
+                docker run --rm \
+                    -v ${WORKSPACE}:/app \
+                    -u $(id -u):$(id -g) \
+                    aquasec/trivy:latest fs /app/juice-shop \
+                    --format json \
+                    --output /app/trivy-report.json \
+                    --debug || true
+
+                if [ -f "${WORKSPACE}/trivy-report.json" ]; then
+                    echo "✅ Trivy report created successfully!"
+                    ls -la ${WORKSPACE}/trivy-report.json
+                else
+                    echo "❌ Trivy report not created!"
+                    echo "Displaying Trivy output in table format for debugging..."
+                    docker run --rm -v ${WORKSPACE}:/app aquasec/trivy:latest fs /app/juice-shop --format table
+                fi
+            '''
         }
+    }
+}
+
+
+        
 
         // 6️⃣ Upload Sonar report to DefectDojo
         stage('Upload Sonar Report to DefectDojo') {
