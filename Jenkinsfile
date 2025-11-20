@@ -40,11 +40,9 @@ pipeline {
             }
         }
 
-        // 3️⃣ Wait for SonarQube
+        // 3️⃣ Wait for SonarQube processing
         stage('Wait for Processing') {
-            steps {
-                sleep time: 2, unit: 'MINUTES'
-            }
+            steps { sleep time: 2, unit: 'MINUTES' }
         }
 
         // 4️⃣ Quality Gate
@@ -64,65 +62,63 @@ pipeline {
             }
         }
 
-        // 5️⃣ Trivy SCAN using Docker container (ephemeral)
-        stage('Trivy FS Scan (via Docker)') {
+        // 5️⃣ Trivy scan (ephemeral container)
+        stage('Trivy FS Scan') {
             steps {
                 script {
                     sh """
                         docker run --rm \
-                            -v \$(pwd):/app \
+                            -v ${WORKSPACE}:/app \
                             aquasec/trivy:latest fs /app/juice-shop \
                             --format json \
                             --output /app/trivy-report.json || true
-                     """
-               echo "📄 Trivy report generated: trivy-report.json"
+                    """
+                    echo "📄 Trivy report generated: ${WORKSPACE}/trivy-report.json"
                 }
             }
         }
 
-
-        // 6️⃣ Export Sonar → DefectDojo
+        // 6️⃣ Upload Sonar report to DefectDojo
         stage('Upload Sonar Report to DefectDojo') {
             steps {
                 script {
                     sh """
-                        curl -u ${SONARQUBE_TOKEN}: \
-                        "${SONAR_HOST}/api/issues/search?projectKeys=${PROJECT_KEY}&ps=500" \
-                        -o sonar-report.json
+                        curl -s -u '${SONARQUBE_TOKEN}:' \
+                        '${SONAR_HOST}/api/issues/search?projectKeys=${PROJECT_KEY}&ps=500' \
+                        -o ${WORKSPACE}/sonar-report.json
                     """
 
                     sh """
-                        curl -X POST "${DEFECTDOJO_URL}/api/v2/import-scan/" \
-                            -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
-                            -F "scan_type=SonarQube Scan" \
-                            -F "engagement=${DEFECTDOJO_ENGAGEMENT_ID}" \
-                            -F "file=@sonar-report.json"
+                        curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
+                        -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                        -F 'scan_type=SonarQube Scan' \
+                        -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                        -F 'file=@${WORKSPACE}/sonar-report.json'
                     """
                 }
             }
         }
 
-        // 7️⃣ Upload Trivy → DefectDojo
+        // 7️⃣ Upload Trivy report to DefectDojo
         stage('Upload Trivy Report to DefectDojo') {
             steps {
                 script {
                     sh """
-                        curl -X POST "${DEFECTDOJO_URL}/api/v2/import-scan/" \
-                            -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
-                            -F "scan_type=Trivy Scan" \
-                            -F "engagement=${DEFECTDOJO_ENGAGEMENT_ID}" \
-                            -F "file=@trivy-report.json"
+                        curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
+                        -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                        -F 'scan_type=Trivy Scan' \
+                        -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                        -F 'file=@${WORKSPACE}/trivy-report.json'
                     """
                 }
             }
         }
 
-        // 8️⃣ Build Docker image
+        // 8️⃣ Build Docker Image
         stage('Build Docker Image') {
             steps {
                 script {
                     echo "🚀 Building Docker image from Juice Shop source..."
-
                     dockerImage = docker.build(
                         "juice-shop:${env.BUILD_NUMBER}",
                         "./juice-shop"
@@ -131,7 +127,7 @@ pipeline {
             }
         }
 
-        // 9️⃣ Run container
+        // 9️⃣ Run Docker container
         stage('Run Juice Shop Container') {
             steps {
                 script {
@@ -146,7 +142,7 @@ pipeline {
             }
         }
 
-    } // end stages
+    }
 
     post {
         success { echo '✅ Pipeline completed successfully!' }
