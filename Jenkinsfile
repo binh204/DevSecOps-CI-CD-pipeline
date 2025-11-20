@@ -95,6 +95,7 @@ pipeline {
                         -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
                         -F 'file=@${WORKSPACE}/sonar-report.json'
                     """
+                    echo "📄 SonarQube upload report to DefectDojo......."
                 }
             }
         }
@@ -110,6 +111,7 @@ pipeline {
                         -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
                         -F 'file=@${WORKSPACE}/trivy-report.json'
                     """
+                     echo "📄 Trivy upload report to DefectDojo......."
                 }
             }
         }
