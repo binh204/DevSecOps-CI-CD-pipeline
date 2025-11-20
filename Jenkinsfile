@@ -102,20 +102,32 @@ pipeline {
         }
 
         // 7️⃣ Upload Trivy report to DefectDojo
-        stage('Upload Trivy Report to DefectDojo') {
-            steps {
-                script {
-                    echo "📄 Trivy upload report to DefectDojo......."
-                    sh """
-                        curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
-                        -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
-                        -F 'scan_type=Trivy Scan' \
-                        -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
-                        -F 'file=@${WORKSPACE}/trivy-report.json'
-                    """
-                }
+       stage('Upload Trivy Report to DefectDojo') {
+    steps {
+        script {
+            echo "📄 Uploading Trivy report to DefectDojo..."
+            // curl bỏ -s để hiển thị thông tin, dùng -w '%{http_code}' để xem HTTP status
+            def status = sh(
+                script: """
+                    curl -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
+                    -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                    -F 'scan_type=Trivy Scan' \
+                    -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                    -F 'file=@${WORKSPACE}/trivy-report.json' \
+                    -w '%{http_code}' -o /dev/null
+                """,
+                returnStdout: true
+            ).trim()
+
+            if (status == '201' || status == '200') {
+                echo "✅ Trivy report uploaded successfully (HTTP ${status})"
+            } else {
+                error "❌ Failed to upload Trivy report (HTTP ${status})"
             }
         }
+    }
+}
+
 
         // 8️⃣ Build Docker Image
         stage('Build Docker Image') {
