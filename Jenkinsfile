@@ -24,7 +24,7 @@ pipeline {
                         sh """
                             ${scannerHome}/bin/sonar-scanner \
                                 -Dsonar.projectKey=DevSecOps \
-                                -Dsonar.sources=juice-shop \
+                                -Dsonar.sources=. \
                                 -Dsonar.login=${SONARQUBE_TOKEN}
                         """
                     }
