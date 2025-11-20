@@ -65,25 +65,21 @@ pipeline {
         }
 
         // 5️⃣ Trivy SCAN using Docker container (ephemeral)
-        stage('Trivy Source Scan') {
+        stage('Trivy FS Scan (via Docker)') {
             steps {
                 script {
-                    sh '''
-                        echo "🚀 Running Trivy container to scan source code..."
-
+                    sh """
                         docker run --rm \
-                            -v $(pwd)/juice-shop:/project \
-                            -v $(pwd):/output \
-                            aquasec/trivy:latest \
-                            fs /project \
+                            -v \$(pwd):/app \
+                            aquasec/trivy:latest fs /app/juice-shop \
                             --format json \
-                            --output /output/trivy-report.json || true
-                    '''
-
-                    echo "📄 Trivy report generated: trivy-report.json"
+                            --output /app/trivy-report.json || true
+                     """
+               echo "📄 Trivy report generated: trivy-report.json"
                 }
             }
         }
+
 
         // 6️⃣ Export Sonar → DefectDojo
         stage('Upload Sonar Report to DefectDojo') {
