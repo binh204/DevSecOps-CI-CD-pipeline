@@ -74,7 +74,8 @@ pipeline {
                 echo "🛡 Running Trivy scan..."
                 docker run --rm \
                     -v ${WORKSPACE}:/app \
-                    -v ${WORKSPACE}/.trivy-cache:/root/.cache/trivy \
+                    -v ${WORKSPACE}/.trivy-cache:/trivy-cache \
+                    -e TRIVY_CACHE_DIR=/trivy-cache \
                     -u \$(id -u):\$(id -g) \
                     aquasec/trivy:latest fs /app/juice-shop \
                     --format json \
@@ -103,12 +104,13 @@ pipeline {
                 else
                     echo "❌ Trivy report not created!"
                     echo "Displaying Trivy output in table format for debugging..."
-                    docker run --rm -v ${WORKSPACE}:/app aquasec/trivy:latest fs /app/juice-shop --format table
+                    docker run --rm -v ${WORKSPACE}:/app -e TRIVY_CACHE_DIR=/trivy-cache aquasec/trivy:latest fs /app/juice-shop --format table
                 fi
             """
         }
     }
 }
+
 
 
 
