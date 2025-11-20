@@ -71,8 +71,7 @@ pipeline {
                             -v ${WORKSPACE}:/app \
                             aquasec/trivy:latest fs /app/juice-shop \
                             --format json \
-                            --output /app/trivy-report.json \
-                            --debug
+                            --output /app/trivy-report.json || true
                     """
                     echo "📄 Trivy report generated: ${WORKSPACE}/trivy-report.json"
                 }
@@ -83,7 +82,6 @@ pipeline {
         stage('Upload Sonar Report to DefectDojo') {
             steps {
                 script {
-                    echo "📄 SonarQube upload report to DefectDojo......."
                     sh """
                         curl -s -u '${SONARQUBE_TOKEN}:' \
                         '${SONAR_HOST}/api/issues/search?projectKeys=${PROJECT_KEY}&ps=500' \
@@ -102,32 +100,19 @@ pipeline {
         }
 
         // 7️⃣ Upload Trivy report to DefectDojo
-       stage('Upload Trivy Report to DefectDojo') {
-    steps {
-        script {
-            echo "📄 Uploading Trivy report to DefectDojo..."
-            // curl bỏ -s để hiển thị thông tin, dùng -w '%{http_code}' để xem HTTP status
-            def status = sh(
-                script: """
-                    curl -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
-                    -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
-                    -F 'scan_type=Trivy Scan' \
-                    -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
-                    -F 'file=@${WORKSPACE}/trivy-report.json' \
-                    -w '%{http_code}' -o /dev/null
-                """,
-                returnStdout: true
-            ).trim()
-
-            if (status == '201' || status == '200') {
-                echo "✅ Trivy report uploaded successfully (HTTP ${status})"
-            } else {
-                error "❌ Failed to upload Trivy report (HTTP ${status})"
+        stage('Upload Trivy Report to DefectDojo') {
+            steps {
+                script {
+                    sh """
+                        curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
+                        -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                        -F 'scan_type=Trivy Scan' \
+                        -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                        -F 'file=@${WORKSPACE}/trivy-report.json'
+                    """
+                }
             }
         }
-    }
-}
-
 
         // 8️⃣ Build Docker Image
         stage('Build Docker Image') {
