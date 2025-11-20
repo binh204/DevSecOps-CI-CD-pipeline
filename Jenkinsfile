@@ -70,8 +70,8 @@ pipeline {
                 script {
                     echo "🏃 Running container from image..."
                     sh '''
-                        docker stop juice-app || true
-                        docker rm juice-app || true
+                        docker stop juice-shop || true
+                        docker rm juice-shop || true
                     '''
                     sh "docker run -d --name juice-app -p 3000:3000 juice-shop:${BUILD_NUMBER}"
                     sleep 25 // đợi container sẵn sàng
@@ -125,13 +125,7 @@ pipeline {
     post {
         success { echo '✅ Pipeline completed successfully!' }
         failure { echo '❌ Pipeline failed!' }
-        always {
-            echo "🧹 Cleaning up container..."
-            sh '''
-                docker stop juice-app || true
-                docker rm juice-app || true
-            '''
-        }
+        
     }
 }
 
