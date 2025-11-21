@@ -89,24 +89,28 @@ pipeline {
 
         // 6️⃣ Upload Sonar report to DefectDojo
         stage('Upload Sonar Report to DefectDojo') {
-            steps {
-                script {
-                    sh """
-                        curl -s -u '${SONARQUBE_TOKEN}:' \
-                        '${SONAR_HOST}/api/issues/search?projectKeys=${PROJECT_KEY}&ps=500' \
-                        -o ${WORKSPACE}/sonar-report.json
-                    """
+    steps {
+        withCredentials([
+            string(credentialsId: 'SONARQUBE_TOKEN_ID', variable: 'SONAR_TOKEN'),
+            string(credentialsId: 'DEFECTDOJO_API_KEY_ID', variable: 'DD_API_KEY')
+        ]) {
+            sh '''
+                curl -s -u "$SONAR_TOKEN:" \
+                "$SONAR_HOST/api/issues/search?projectKeys='$PROJECT_KEY'&ps=500" \
+                -o "$WORKSPACE/sonar-report.json"
+            '''
 
-                    sh """
-                        curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
-                        -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
-                        -F 'scan_type=SonarQube Scan' \
-                        -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
-                        -F 'file=@${WORKSPACE}/sonar-report.json'
-                    """
-                }
-            }
+            sh '''
+                curl -s -X POST "$DEFECTDOJO_URL/api/v2/import-scan/" \
+                -H "Authorization: Token $DD_API_KEY" \
+                -F "scan_type=SonarQube Scan" \
+                -F "engagement=$DEFECTDOJO_ENGAGEMENT_ID" \
+                -F "file=@$WORKSPACE/sonar-report.json"
+            '''
         }
+    }
+}
+
 
         // 7️⃣ Upload Trivy report to DefectDojo
         stage('Upload Trivy Report to DefectDojo') {
