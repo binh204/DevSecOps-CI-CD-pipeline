@@ -67,32 +67,25 @@ pipeline {
     steps {
         script {
             sh """
-                HOST_JENKINS_HOME=\$(docker inspect jenkins --format '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Source}}{{end}}{{end}}')
-                HOST_WS="\$HOST_JENKINS_HOME/workspace/DevSecOps"
-
-                echo "🔍 Host workspace: \$HOST_WS"
-
-                mkdir -p "\$HOST_WS/.trivy-cache"
-                chmod -R 777 "\$HOST_WS/.trivy-cache"
+                echo "🛡 Running Trivy scan using Jenkins volume..."
 
                 docker run --rm \
-                    -v "\$HOST_WS:/app" \
-                    -v "\$HOST_WS/.trivy-cache:/trivy-cache" \
-                    -e TRIVY_CACHE_DIR=/trivy-cache \
-                    aquasec/trivy:latest fs /app/juice-shop \
+                    -v jenkins_home:/var/jenkins_home \
+                    aquasec/trivy:latest fs /var/jenkins_home/workspace/DevSecOps/juice-shop \
                     --format json \
-                    --output /app/trivy-report.json \
+                    --output /var/jenkins_home/workspace/DevSecOps/trivy-report.json \
                     --debug || true
 
-                if [ -f "/var/jenkins_home/workspace/DevSecOps/trivy-report.json" ]; then
-                    echo "✅ Trivy report created!"
+                if [ -f "${WORKSPACE}/trivy-report.json" ]; then
+                    echo "✅ Trivy report created successfully!"
                 else
-                    echo "❌ Trivy report not created!"
+                    echo "❌ Trivy report NOT created!"
                 fi
             """
         }
     }
 }
+
 
         // 6️⃣ Upload Sonar report to DefectDojo
         stage('Upload Sonar Report to DefectDojo') {
