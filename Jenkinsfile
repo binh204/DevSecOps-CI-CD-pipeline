@@ -160,19 +160,19 @@ stage('ZAP Scan & Generate Report') {
 
             # Chạy ZAP container tạm thời (daemon)
             docker run --rm -u zap -v ${WORKSPACE}:${WORKSPACE} \
-                owasp/zap2docker-stable zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.disablekey=true
+                zaproxy/zap-stable zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
 
             # Đợi ZAP sẵn sàng (hoặc dùng zap-cli / API check)
             sleep 10
 
             # Crawl Juice Shop
-            docker run --rm -v ${WORKSPACE}:${WORKSPACE} owasp/zap2docker-stable zap-cli --zap-url http://host.docker.internal -p 8080 spider http://host.docker.internal:3000
+            docker run --rm -v ${WORKSPACE}:${WORKSPACE} zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8080 spider http://host.docker.internal:3000
 
             # Active scan
-            docker run --rm -v ${WORKSPACE}:${WORKSPACE} owasp/zap2docker-stable zap-cli --zap-url http://host.docker.internal -p 8080 active-scan http://host.docker.internal:3000
+            docker run --rm -v ${WORKSPACE}:${WORKSPACE} zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8080 active-scan http://host.docker.internal:3000
 
             # Xuất report JSON
-            docker run --rm -v ${WORKSPACE}:${WORKSPACE} owasp/zap2docker-stable zap-cli --zap-url http://host.docker.internal -p 8080 report -o ${WORKSPACE}/zap-report.json -f json
+            docker run --rm -v ${WORKSPACE}:${WORKSPACE} zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8080 report -o ${WORKSPACE}/zap-report.json -f json
 
             # Kiểm tra file
             if [ -f "${WORKSPACE}/zap-report.json" ]; then
