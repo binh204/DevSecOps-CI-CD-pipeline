@@ -151,7 +151,7 @@ pipeline {
                 }
             }
 
-        // 1️⃣ Stage: ZAP Scan
+/*        // 1️⃣ Stage: ZAP Scan
 stage('ZAP Scan & Generate Report') {
     steps {
         script {
@@ -200,11 +200,7 @@ stage('Upload ZAP Report to DefectDojo') {
     }
 }
         }
-
-        
-
-
-
+*/
     post {
         success { echo '✅ Pipeline completed successfully!' }
         failure { echo '❌ Pipeline failed!' }
