@@ -67,26 +67,25 @@ pipeline {
     steps {
         script {
             sh """
-                mkdir -p ${WORKSPACE}/.trivy-cache
-                chmod -R 777 ${WORKSPACE}/.trivy-cache
+                HOST_JENKINS_HOME=\$(docker inspect jenkins --format '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Source}}{{end}}{{end}}')
+                HOST_WS="\$HOST_JENKINS_HOME/workspace/DevSecOps"
 
-                echo "📁 Current workspace: ${WORKSPACE}"
-                echo "Checking juice-shop directory..."
-                ls -la ${WORKSPACE}/juice-shop || echo "❌ Directory not found"
+                echo "🔍 Host workspace: \$HOST_WS"
 
-                echo "🛡 Running Trivy scan..."
+                mkdir -p "\$HOST_WS/.trivy-cache"
+                chmod -R 777 "\$HOST_WS/.trivy-cache"
+
                 docker run --rm \
-                    -v ${WORKSPACE}:/app \
-                    -v ${WORKSPACE}/.trivy-cache:/trivy-cache \
+                    -v "\$HOST_WS:/app" \
+                    -v "\$HOST_WS/.trivy-cache:/trivy-cache" \
                     -e TRIVY_CACHE_DIR=/trivy-cache \
                     aquasec/trivy:latest fs /app/juice-shop \
                     --format json \
                     --output /app/trivy-report.json \
                     --debug || true
 
-                if [ -f "${WORKSPACE}/trivy-report.json" ]; then
-                    echo "✅ Trivy report created successfully!"
-                    ls -la ${WORKSPACE}/trivy-report.json
+                if [ -f "/var/jenkins_home/workspace/DevSecOps/trivy-report.json" ]; then
+                    echo "✅ Trivy report created!"
                 else
                     echo "❌ Trivy report not created!"
                 fi
