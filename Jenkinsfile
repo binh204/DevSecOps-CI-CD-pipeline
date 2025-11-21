@@ -150,7 +150,6 @@ pipeline {
                     }
                 }
             }
-        }
 
         // 1️⃣ Stage: ZAP Scan
 stage('ZAP Scan & Generate Report') {
@@ -200,6 +199,9 @@ stage('Upload ZAP Report to DefectDojo') {
         }
     }
 }
+        }
+
+        
 
 
 
