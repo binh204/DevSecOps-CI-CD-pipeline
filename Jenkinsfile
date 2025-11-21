@@ -64,28 +64,27 @@ pipeline {
 
         // 5️⃣ Trivy scan (ephemeral container)
         stage('Trivy FS Scan & Upload') {
-    steps {
-        script {
-            sh """
-                echo "🛡 Running Trivy scan using Jenkins volume..."
+            steps {
+                script {
+                    sh """
+                        echo "🛡 Running Trivy scan using Jenkins volume..."
+    
+                        docker run --rm \
+                            -v jenkins_home:/var/jenkins_home \
+                            aquasec/trivy:latest fs /var/jenkins_home/workspace/DevSecOps/juice-shop \
+                            --format json \
+                            --output /var/jenkins_home/workspace/DevSecOps/trivy-report.json \
+                            --debug || true
 
-                docker run --rm \
-                    -v jenkins_home:/var/jenkins_home \
-                    aquasec/trivy:latest fs /var/jenkins_home/workspace/DevSecOps/juice-shop \
-                    --format json \
-                    --output /var/jenkins_home/workspace/DevSecOps/trivy-report.json \
-                    --debug || true
-
-                if [ -f "${WORKSPACE}/trivy-report.json" ]; then
-                    echo "✅ Trivy report created successfully!"
-                else
-                    echo "❌ Trivy report NOT created!"
-                fi
-            """
+                            if [ -f "${WORKSPACE}/trivy-report.json" ]; then
+                                echo "✅ Trivy report created successfully!"
+                            else
+                                echo "❌ Trivy report NOT created!"
+                            fi
+                            """
+                }
+            }
         }
-    }
-}
-
 
         // 6️⃣ Upload Sonar report to DefectDojo
          stage('Upload Sonar Report to DefectDojo') {
@@ -148,11 +147,61 @@ pipeline {
                     '''
                     sh "docker run -d --name juice-app -p 3000:3000 juice-shop:${BUILD_NUMBER}"
                     sleep 25
+                    }
                 }
             }
         }
 
+        // 1️⃣ Stage: ZAP Scan
+stage('ZAP Scan & Generate Report') {
+    steps {
+        script {
+            sh """
+            echo "🛡 Running OWASP ZAP scan..."
+
+            # Chạy ZAP container tạm thời (daemon)
+            docker run --rm -u zap -v ${WORKSPACE}:${WORKSPACE} \
+                owasp/zap2docker-stable zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.disablekey=true
+
+            # Đợi ZAP sẵn sàng (hoặc dùng zap-cli / API check)
+            sleep 10
+
+            # Crawl Juice Shop
+            docker run --rm -v ${WORKSPACE}:${WORKSPACE} owasp/zap2docker-stable zap-cli --zap-url http://host.docker.internal -p 8080 spider http://host.docker.internal:3000
+
+            # Active scan
+            docker run --rm -v ${WORKSPACE}:${WORKSPACE} owasp/zap2docker-stable zap-cli --zap-url http://host.docker.internal -p 8080 active-scan http://host.docker.internal:3000
+
+            # Xuất report JSON
+            docker run --rm -v ${WORKSPACE}:${WORKSPACE} owasp/zap2docker-stable zap-cli --zap-url http://host.docker.internal -p 8080 report -o ${WORKSPACE}/zap-report.json -f json
+
+            # Kiểm tra file
+            if [ -f "${WORKSPACE}/zap-report.json" ]; then
+                echo "✅ ZAP report created successfully!"
+            else
+                echo "❌ ZAP report NOT created!"
+            fi
+            """
+        }
     }
+}
+
+// 2️⃣ Stage: Upload ZAP report to DefectDojo
+stage('Upload ZAP Report to DefectDojo') {
+    steps {
+        script {
+            sh """
+            curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
+                 -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                 -F 'scan_type=ZAP Scan' \
+                 -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                 -F 'file=@${WORKSPACE}/zap-report.json'
+            """
+        }
+    }
+}
+
+
 
     post {
         success { echo '✅ Pipeline completed successfully!' }
