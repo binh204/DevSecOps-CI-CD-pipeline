@@ -156,25 +156,27 @@ stage('ZAP Scan & Generate Report') {
     steps {
         script {
             sh """
-            echo "🛡 Running OWASP ZAP scan..."
+            echo "🛡 Running OWASP ZAP daemon..."
 
-            # Chạy ZAP container tạm thời (daemon)
-            docker run --rm -u zap -v ${WORKSPACE}:${WORKSPACE} \
+            # Start ZAP daemon in background
+            docker run -d --name zap-daemon -u zap \
+                -p 8082:8082 \
+                -v ${WORKSPACE}:${WORKSPACE} \
                 zaproxy/zap-stable zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
 
-            # Đợi ZAP sẵn sàng (hoặc dùng zap-cli / API check)
-            sleep 10
+            sleep 15
 
-            # Crawl Juice Shop
-            docker run --rm -v ${WORKSPACE}:${WORKSPACE} zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8080 spider http://host.docker.internal:3000
+            echo "🕷 Crawling Juice Shop..."
+            docker run --rm zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8082 spider http://host.docker.internal:3000
 
-            # Active scan
-            docker run --rm -v ${WORKSPACE}:${WORKSPACE} zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8080 active-scan http://host.docker.internal:3000
+            echo "⚡ Active Scan..."
+            docker run --rm zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8082 active-scan http://host.docker.internal:3000
 
-            # Xuất report JSON
-            docker run --rm -v ${WORKSPACE}:${WORKSPACE} zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8080 report -o ${WORKSPACE}/zap-report.json -f json
+            echo "📄 Generating report..."
+            docker run --rm -v ${WORKSPACE}:${WORKSPACE} zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8082 report -o ${WORKSPACE}/zap-report.json -f json
 
-            # Kiểm tra file
+            docker stop zap-daemon
+
             if [ -f "${WORKSPACE}/zap-report.json" ]; then
                 echo "✅ ZAP report created successfully!"
             else
@@ -184,6 +186,7 @@ stage('ZAP Scan & Generate Report') {
         }
     }
 }
+
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
