@@ -155,37 +155,49 @@ pipeline {
 stage('ZAP Scan & Generate Report') {
     steps {
         script {
-            sh """
-            echo "🛡 Running OWASP ZAP daemon..."
 
-            # Start ZAP daemon in background
-            docker run -d --name zap-daemon -u zap \
-                -p 8082:8082 \
+            sh """
+            echo "🛡 Starting OWASP ZAP daemon..."
+
+            # Start ZAP daemon in background using host network
+            docker run -d --name zap-daemon --network host \
+                -u zap \
                 -v ${WORKSPACE}:${WORKSPACE} \
                 zaproxy/zap-stable zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
 
+            echo "⏳ Waiting for ZAP daemon to start..."
             sleep 15
 
-            echo "🕷 Crawling Juice Shop..."
-            docker run --rm zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8082 spider http://host.docker.internal:3000
+            echo "🕷 Running Spider scan..."
+            docker run --rm --network host \
+                -v ${WORKSPACE}:${WORKSPACE} \
+                zaproxy/zap-stable zap-cli --zap-url http://127.0.0.1 -p 8082 spider http://127.0.0.1:3000
 
-            echo "⚡ Active Scan..."
-            docker run --rm zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8082 active-scan http://host.docker.internal:3000
+            echo "⚡ Running Active Scan..."
+            docker run --rm --network host \
+                -v ${WORKSPACE}:${WORKSPACE} \
+                zaproxy/zap-stable zap-cli --zap-url http://127.0.0.1 -p 8082 active-scan http://127.0.0.1:3000
 
-            echo "📄 Generating report..."
-            docker run --rm -v ${WORKSPACE}:${WORKSPACE} zaproxy/zap-stable zap-cli --zap-url http://host.docker.internal -p 8082 report -o ${WORKSPACE}/zap-report.json -f json
+            echo "📄 Generating ZAP report..."
+            docker run --rm --network host \
+                -v ${WORKSPACE}:${WORKSPACE} \
+                zaproxy/zap-stable zap-cli --zap-url http://127.0.0.1 -p 8082 report -o ${WORKSPACE}/zap-report.json -f json
 
-            docker stop zap-daemon
+            echo "🛑 Stopping ZAP daemon..."
+            docker stop zap-daemon || true
+            docker rm zap-daemon || true
 
             if [ -f "${WORKSPACE}/zap-report.json" ]; then
-                echo "✅ ZAP report created successfully!"
+                echo "✅ ZAP report created: ${WORKSPACE}/zap-report.json"
             else
                 echo "❌ ZAP report NOT created!"
+                exit 1
             fi
             """
         }
     }
 }
+
 
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
