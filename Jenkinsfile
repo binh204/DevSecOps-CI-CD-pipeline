@@ -157,36 +157,22 @@ stage('ZAP Scan & Generate Report') {
         script {
 
             sh """
-            echo "🛡 Starting OWASP ZAP daemon..."
+            echo "🛡 Starting OWASP ZAP API Scan..."
 
-            # Start ZAP daemon in background using host network
-            docker run -d --name zap-daemon --network host \
-                -u zap \
-                -v ${WORKSPACE}:${WORKSPACE} \
-                zaproxy/zap-stable zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
-
-            echo "⏳ Waiting for ZAP daemon to start..."
-            sleep 15
-
-            echo "🕷 Running Spider scan..."
+            # Run ZAP API scan directly without zap-cli or daemon mode
             docker run --rm --network host \
-                -v ${WORKSPACE}:${WORKSPACE} \
-                zaproxy/zap-stable zap-cli --zap-url http://127.0.0.1 -p 8082 spider http://127.0.0.1:3000
+                -v ${WORKSPACE}:/zap/wrk \
+                zaproxy/zap-stable zap-api-scan.py \
+                    -t http://127.0.0.1:3000 \
+                    -f openapi \
+                    -r zap-report.html \
+                    -w zap-warnings.html \
+                    -J zap-report.json
 
-            echo "⚡ Running Active Scan..."
-            docker run --rm --network host \
-                -v ${WORKSPACE}:${WORKSPACE} \
-                zaproxy/zap-stable zap-cli --zap-url http://127.0.0.1 -p 8082 active-scan http://127.0.0.1:3000
+            echo "📄 ZAP reports generated:"
+            ls -l ${WORKSPACE}
 
-            echo "📄 Generating ZAP report..."
-            docker run --rm --network host \
-                -v ${WORKSPACE}:${WORKSPACE} \
-                zaproxy/zap-stable zap-cli --zap-url http://127.0.0.1 -p 8082 report -o ${WORKSPACE}/zap-report.json -f json
-
-            echo "🛑 Stopping ZAP daemon..."
-            docker stop zap-daemon || true
-            docker rm zap-daemon || true
-
+            # Check if JSON report exists
             if [ -f "${WORKSPACE}/zap-report.json" ]; then
                 echo "✅ ZAP report created: ${WORKSPACE}/zap-report.json"
             else
@@ -197,6 +183,7 @@ stage('ZAP Scan & Generate Report') {
         }
     }
 }
+
 
 
 
