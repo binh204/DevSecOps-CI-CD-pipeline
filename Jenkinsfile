@@ -161,6 +161,9 @@ stage('ZAP Crawl & Active Scan') {
             # Tạo folder lưu báo cáo
             mkdir -p ${WORKSPACE}/zap-reports
 
+            # Xóa container cũ nếu tồn tại
+            docker rm -f zap-daemon || true
+
             # Start ZAP daemon
             docker run -d --name zap-daemon --network host \
                 -u zap \
@@ -195,8 +198,6 @@ stage('ZAP Crawl & Active Scan') {
         }
     }
 }
-
-
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
