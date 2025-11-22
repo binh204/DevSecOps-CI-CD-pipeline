@@ -155,12 +155,15 @@ pipeline {
 stage('ZAP Scan & Generate Report') {
     steps {
         script {
-
             sh """
             echo "🛡 Starting OWASP ZAP API Scan..."
 
-            # Run ZAP API scan directly without zap-cli or daemon mode
+            # Give workspace write permission
+            chmod -R 777 ${WORKSPACE}
+
+            # Run ZAP scan
             docker run --rm --network host \
+                -u zap \
                 -v ${WORKSPACE}:/zap/wrk \
                 zaproxy/zap-stable zap-api-scan.py \
                     -t http://127.0.0.1:3000 \
@@ -172,7 +175,6 @@ stage('ZAP Scan & Generate Report') {
             echo "📄 ZAP reports generated:"
             ls -l ${WORKSPACE}
 
-            # Check if JSON report exists
             if [ -f "${WORKSPACE}/zap-report.json" ]; then
                 echo "✅ ZAP report created: ${WORKSPACE}/zap-report.json"
             else
@@ -183,9 +185,6 @@ stage('ZAP Scan & Generate Report') {
         }
     }
 }
-
-
-
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
