@@ -158,13 +158,13 @@ stage('ZAP Scan & Generate Report') {
             sh """
             echo "🛡 Starting OWASP ZAP API Scan..."
 
-            # Give workspace write permission
-            chmod -R 777 ${WORKSPACE}
+            # Create a dedicated folder for ZAP reports
+            mkdir -p ${WORKSPACE}/zap-reports
 
             # Run ZAP scan
             docker run --rm --network host \
                 -u zap \
-                -v ${WORKSPACE}:/zap/wrk \
+                -v ${WORKSPACE}/zap-reports:/zap/wrk \
                 zaproxy/zap-stable zap-api-scan.py \
                     -t http://127.0.0.1:3000 \
                     -f openapi \
@@ -173,10 +173,10 @@ stage('ZAP Scan & Generate Report') {
                     -J zap-report.json
 
             echo "📄 ZAP reports generated:"
-            ls -l ${WORKSPACE}
+            ls -l ${WORKSPACE}/zap-reports
 
-            if [ -f "${WORKSPACE}/zap-report.json" ]; then
-                echo "✅ ZAP report created: ${WORKSPACE}/zap-report.json"
+            if [ -f "${WORKSPACE}/zap-reports/zap-report.json" ]; then
+                echo "✅ ZAP report created: ${WORKSPACE}/zap-reports/zap-report.json"
             else
                 echo "❌ ZAP report NOT created!"
                 exit 1
@@ -185,6 +185,7 @@ stage('ZAP Scan & Generate Report') {
         }
     }
 }
+
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
