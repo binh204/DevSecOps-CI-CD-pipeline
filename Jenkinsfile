@@ -158,35 +158,32 @@ stage('ZAP Crawl & Active Scan') {
             sh """
             echo "🛡 Starting OWASP ZAP daemon..."
 
-            # Tạo folder lưu báo cáo
             mkdir -p ${WORKSPACE}/zap-reports
 
             # Xóa container cũ nếu tồn tại
             docker rm -f zap-daemon || true
 
-            # Start ZAP daemon và expose port 8082
-            docker run -d --name zap-daemon -p 8082:8082 \
+            # Start ZAP daemon với network host gateway để container khác có thể connect
+            docker run -d --name zap-daemon \
+                --add-host=host.docker.internal:host-gateway \
+                -p 8082:8082 \
                 -u zap \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
-                zaproxy/zap-stable \
+                zaproxy/zap2docker-stable \
                 zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
 
             echo "⏳ Waiting for ZAP daemon to start..."
             sleep 20
 
-            # Spider scan
-            echo "🕷 Starting Spider scan..."
-            curl "http://localhost:8082/JSON/spider/action/scan/?url=http://host.docker.internal:3000"
+            echo "🕷 Running Spider scan..."
+            curl "http://host.docker.internal:8082/JSON/spider/action/scan/?url=http://host.docker.internal:3000"
 
-            # Active scan
-            echo "⚡ Starting Active scan..."
-            curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://host.docker.internal:3000"
+            echo "⚡ Running Active scan..."
+            curl "http://host.docker.internal:8082/JSON/ascan/action/scan/?url=http://host.docker.internal:3000"
 
-            # Generate report
             echo "📄 Generating report..."
             docker exec zap-daemon zap.sh -cmd -quickurl http://host.docker.internal:3000 -quickout /zap/wrk/zap-report.html
 
-            # Stop daemon
             echo "🛑 Stopping ZAP daemon..."
             docker stop zap-daemon
             docker rm zap-daemon
@@ -197,6 +194,7 @@ stage('ZAP Crawl & Active Scan') {
         }
     }
 }
+
 
 
 
