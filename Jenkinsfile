@@ -158,46 +158,48 @@ stage('ZAP Crawl & Active Scan') {
             sh """
             echo "🛡 Starting OWASP ZAP daemon..."
 
-            # Tạo folder lưu báo cáo
             mkdir -p ${WORKSPACE}/zap-reports
 
-            # Xóa container cũ nếu tồn tại
             docker rm -f zap-daemon || true
 
-            # Start ZAP daemon
             docker run -d --name zap-daemon --network host \
                 -u zap \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
-                zaproxy/zap-stable zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
+                zaproxy/zap-stable \
+                zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
 
-            echo "⏳ Waiting for ZAP daemon to start..."
+            echo "⏳ Waiting for ZAP daemon..."
             sleep 15
 
-            echo "🕷 Running Spider scan..."
-            docker run --rm --network host \
-                -v ${WORKSPACE}/zap-reports:/zap/wrk \
-                zaproxy/zap-stable zap-cli --zap-url http://127.0.0.1 -p 8082 spider http://127.0.0.1:3000
+            echo "🕷 Starting Spider scan..."
+            curl "http://127.0.0.1:8082/JSON/spider/action/scan/?url=http://127.0.0.1:3000"
+            echo "⏳ Waiting spider..."
+            sleep 20
 
-            echo "⚡ Running Active Scan..."
-            docker run --rm --network host \
-                -v ${WORKSPACE}/zap-reports:/zap/wrk \
-                zaproxy/zap-stable zap-cli --zap-url http://127.0.0.1 -p 8082 active-scan http://127.0.0.1:3000
+            echo "⚡ Starting Active Scan..."
+            curl "http://127.0.0.1:8082/JSON/ascan/action/scan/?url=http://127.0.0.1:3000"
+            echo "⏳ Waiting active scan..."
+            sleep 60
 
-            echo "📄 Generating report..."
-            docker run --rm --network host \
-                -v ${WORKSPACE}/zap-reports:/zap/wrk \
-                zaproxy/zap-stable zap-cli --zap-url http://127.0.0.1 -p 8082 report -o /zap/wrk/zap-report.json -f json
+            echo "📄 Generating JSON report..."
+            curl "http://127.0.0.1:8082/OTHER/core/other/jsonreport/" \
+                -o ${WORKSPACE}/zap-reports/zap-report.json
+
+            echo "📄 Generating HTML report..."
+            curl "http://127.0.0.1:8082/OTHER/core/other/htmlreport/" \
+                -o ${WORKSPACE}/zap-reports/zap-report.html
 
             echo "🛑 Stopping ZAP daemon..."
             docker stop zap-daemon || true
             docker rm zap-daemon || true
 
-            echo "✅ Reports generated in ${WORKSPACE}/zap-reports:"
+            echo "📁 Generated reports:"
             ls -l ${WORKSPACE}/zap-reports
             """
         }
     }
 }
+
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
