@@ -152,7 +152,7 @@ pipeline {
             }
 
         // 1️⃣ Stage: ZAP Scan
-stage('ZAP Crawl & Active Scan') {
+    stage('ZAP Crawl & Active Scan') {
     steps {
         script {
             sh """
@@ -163,10 +163,8 @@ stage('ZAP Crawl & Active Scan') {
             # Xóa container cũ nếu tồn tại
             docker rm -f zap-daemon || true
 
-            # Start ZAP daemon với network host gateway để container khác có thể connect
-            docker run -d --name zap-daemon \
-                --add-host=host.docker.internal:host-gateway \
-                -p 8082:8082 \
+            # Start ZAP daemon với network host
+            docker run -d --name zap-daemon --network host \
                 -u zap \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
@@ -176,13 +174,13 @@ stage('ZAP Crawl & Active Scan') {
             sleep 20
 
             echo "🕷 Running Spider scan..."
-            curl "http://host.docker.internal:8082/JSON/spider/action/scan/?url=http://host.docker.internal:3000"
+            curl "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
 
             echo "⚡ Running Active scan..."
-            curl "http://host.docker.internal:8082/JSON/ascan/action/scan/?url=http://host.docker.internal:3000"
+            curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://localhost:3000"
 
             echo "📄 Generating report..."
-            docker exec zap-daemon zap.sh -cmd -quickurl http://host.docker.internal:3000 -quickout /zap/wrk/zap-report.html
+            docker exec zap-daemon zap.sh -cmd -quickurl http://localhost:3000 -quickout /zap/wrk/zap-report.html
 
             echo "🛑 Stopping ZAP daemon..."
             docker stop zap-daemon
