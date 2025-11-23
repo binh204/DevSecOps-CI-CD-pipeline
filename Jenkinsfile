@@ -169,7 +169,7 @@ stage('ZAP Crawl & Active Scan') {
                 -p 8082:8082 \
                 -u zap \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
-                zaproxy/zap2docker-stable \
+                zaproxy/zap-stable \
                 zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
 
             echo "⏳ Waiting for ZAP daemon to start..."
