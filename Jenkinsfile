@@ -12,9 +12,9 @@ pipeline {
         DEFECTDOJO_URL = 'http://192.168.73.36:8080'
         DEFECTDOJO_ENGAGEMENT_ID = '1'
     }
-    /*
-    stages {
     
+    stages {
+    /*
         // 1️⃣ Checkout code
         stage('Checkout') {
             steps {
