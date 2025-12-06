@@ -156,42 +156,39 @@ pipeline {
     steps {
         script {
             sh '''
-            echo "🛡 Starting OWASP ZAP daemon..."
+            echo "🛡 Start OWASP ZAP Daemon MODE"
 
             mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
 
             docker run -d --name zap-daemon \
-                -p 8082:8082 \
+                -p 8082:8080 \               # <-- LƯU Ý PORT THẬT CỦA API LÀ 8080
                 -v $WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
-                zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
+                zap.sh -daemon -port 8080 -host 0.0.0.0 -config api.disablekey=true
 
-            echo "⏳ Waiting for ZAP API..."
-            for i in $(seq 1 30); do
-                if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
-                    echo "🚀 ZAP is ready!"
+            echo "⏳ Wait until ZAP REST API online..."
+            for i in $(seq 1 40); do
+                if curl -s http://localhost:8080/JSON/core/view/version/ > /dev/null; then
+                    echo "🔥 ZAP Ready!"
                     break
                 fi
-                echo "⏳ Still starting... retry $i/30"
-                sleep 5
+                echo "… retry $i/40"
+                sleep 3
             done
 
-            echo "🕷 Spider scanning..."
-            curl "http://localhost:8082/JSON/spider/action/scan/?url=http://host.docker.internal:3000&recurse=true"
+            echo "🕷 Spider Scan"
+            curl "http://localhost:8080/JSON/spider/action/scan/?url=http://host.docker.internal:3000"
 
-            echo "⚡ Active scanning..."
-            curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://host.docker.internal:3000"
+            echo "⚡ Active Scan"
+            curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://host.docker.internal:3000"
 
-            echo "📄 Generating report..."
+            echo "📄 Export Report"
             docker exec zap-daemon zap.sh -cmd \
                 -quickurl http://host.docker.internal:3000 \
                 -quickout /zap/wrk/zap-report.html
 
-            echo "🛑 Stopping container"
             docker stop zap-daemon && docker rm zap-daemon
-
-            echo "📁 Report saved: $WORKSPACE/zap-reports/"
             ls -lh $WORKSPACE/zap-reports
             '''
         }
