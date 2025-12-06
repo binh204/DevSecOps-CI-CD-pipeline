@@ -177,10 +177,10 @@ pipeline {
             done
 
             echo "🕷 Running Spider Scan"
-            curl "http://localhost:8080/JSON/spider/action/scan/?url=http://host.docker.internal:3000&recurse=true"
+            curl "http://localhost:8082/JSON/spider/action/scan/?url=http://host.docker.internal:3000&recurse=true"
 
             echo "⚡ Running Active Scan"
-            curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://host.docker.internal:3000"
+            curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://host.docker.internal:3000"
 
             echo "📄 Generating HTML report"
             docker exec zap-daemon zap.sh -cmd -quickurl http://host.docker.internal:3000 -quickout /zap/wrk/zap-report.html
