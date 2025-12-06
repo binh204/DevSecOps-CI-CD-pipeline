@@ -151,27 +151,33 @@ pipeline {
                 }
             }
 
-        // 1️⃣ Stage: ZAP Scan
-    stage('ZAP Crawl & Active Scan') {
+        stage('ZAP Crawl & Active Scan') {
     steps {
         script {
             sh """
             echo "🛡 Starting OWASP ZAP daemon..."
 
             mkdir -p ${WORKSPACE}/zap-reports
-
-            # Xóa container cũ nếu tồn tại
             docker rm -f zap-daemon || true
 
-            # Start ZAP daemon với network host
+            # Khởi động ZAP (daemon mode)
             docker run -d --name zap-daemon --network host \
                 -u zap \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
                 zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
 
-            echo "⏳ Waiting for ZAP daemon to start..."
-            sleep 20
+            echo "⏳ Waiting for ZAP to be ready..."
+
+            # 🔥 Chờ ZAP khởi động hoàn tất thay vì sleep cứng
+            for i in {1..30}; do
+                if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
+                    echo "🚀 ZAP is ready!"
+                    break
+                fi
+                echo "⏳ Still starting... retrying in 5sec"
+                sleep 5
+            done
 
             echo "🕷 Running Spider scan..."
             curl "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
@@ -179,22 +185,21 @@ pipeline {
             echo "⚡ Running Active scan..."
             curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://localhost:3000"
 
-            echo "📄 Generating report..."
-            docker exec zap-daemon zap.sh -cmd -quickurl http://localhost:3000 -quickout /zap/wrk/zap-report.html
+            echo "📄 Generating ZAP HTML report..."
+            docker exec zap-daemon zap.sh \
+                -cmd -quickurl http://localhost:3000 \
+                -quickout /zap/wrk/zap-report.html
 
             echo "🛑 Stopping ZAP daemon..."
             docker stop zap-daemon
             docker rm zap-daemon
 
-            echo "✅ Reports generated in ${WORKSPACE}/zap-reports:"
-            ls -l ${WORKSPACE}/zap-reports
+            echo "📁 Report saved at: ${WORKSPACE}/zap-reports/"
+            ls -lh ${WORKSPACE}/zap-reports
             """
         }
     }
 }
-
-
-
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
