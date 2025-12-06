@@ -205,7 +205,7 @@ stage('Upload ZAP Report to DefectDojo') {
                  -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
                  -F 'scan_type=ZAP Scan' \
                  -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
-                 -F 'file=@${WORKSPACE}/zap-report.json'
+                 -F 'file=@${WORKSPACE}/zap-reports/zap-report.html'
             """
         }
     }
