@@ -156,7 +156,7 @@ pipeline {
     steps {
         script {
             sh '''
-            echo "🛡 Start OWASP ZAP Daemon MODE"
+            echo "🛡 Start ZAP"
 
             mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
@@ -164,36 +164,37 @@ pipeline {
             docker run -d --name zap-daemon \
                 -p 8082:8080 \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
-                zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0 -config api.disablekey=true
+                zaproxy/zap-stable zap.sh -daemon \
+                -port 8080 \
+                -host 0.0.0.0 \
+                -config api.disablekey=true \
+                -config api.addrs.addr.name=.* \
+                -config api.addrs.addr.regex=true
 
-            echo "⏳ Wait until ZAP REST API online..."
+            echo "⏳ Wait API ready"
             for i in $(seq 1 40); do
-                if curl -s http://localhost:8080/JSON/core/view/version/ > /dev/null; then
-                    echo "🔥 ZAP Ready!"
-                    break
-                fi
-                echo "Still starting... retry $i/40"
-                sleep 3
-            done
+                if curl -s http://localhost:8080/JSON/core/view/version/ > /dev/null; then break; fi
+                echo "⏳ retry $i/40"; sleep 3
+            done && echo "🔥 READY"
 
-            echo "🕷 Running Spider Scan"
+            echo "🕷 Spider Scan"
             curl "http://localhost:8080/JSON/spider/action/scan/?url=http://host.docker.internal:3000&recurse=true"
 
-            echo "⚡ Running Active Scan"
+            echo "⚡ Active Scan"
             curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://host.docker.internal:3000"
 
-            echo "📄 Generating HTML report"
-            docker exec zap-daemon zap.sh -cmd -quickurl http://host.docker.internal:3000 -quickout /zap/wrk/zap-report.html
+            echo "📄 Generate Report"
+            docker exec zap-daemon zap.sh -cmd \
+                -quickurl http://host.docker.internal:3000 \
+                -quickout /zap/wrk/zap-report.html
 
             docker stop zap-daemon && docker rm zap-daemon
-            echo "📁 Report saved to workspace/zap-reports"
             ls -lh $WORKSPACE/zap-reports
             '''
         }
     }
 }
-
-
+        
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
     steps {
