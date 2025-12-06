@@ -171,7 +171,7 @@ pipeline {
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
                 zap.sh -daemon -host 0.0.0.0 -port 8082 \
-                -config api.disablekey=true
+                -config api.disablekey=true \
                 -config autoupdate.addoninstall=false \
                 -config autoupdate.checkaddonupdates=false \
                 -config autoupdate.checkonstart=false
