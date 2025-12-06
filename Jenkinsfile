@@ -156,7 +156,6 @@ pipeline {
     steps {
         script {
             sh """
-            apt-get update && apt-get install -y jq  
             echo "🛡 Starting OWASP ZAP daemon..."
 
             mkdir -p ${WORKSPACE}/zap-reports
