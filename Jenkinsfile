@@ -151,69 +151,53 @@ pipeline {
                 }
             }
 
-        // Run ZAP
-       stage('ZAP Crawl & Active Scan') {
+             // 1️⃣ Stage: ZAP Scan
+    stage('ZAP Crawl & Active Scan') {
     steps {
         script {
             sh """
             echo "🛡 Starting OWASP ZAP daemon..."
 
             mkdir -p ${WORKSPACE}/zap-reports
+
+            # Xóa container cũ nếu tồn tại
             docker rm -f zap-daemon || true
 
+            # Start ZAP daemon với network host
+            # Khởi động ZAP (daemon mode)
             docker run -d --name zap-daemon --network host \
                 -u zap \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
                 zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
-
             echo "⏳ Waiting for ZAP to be ready..."
-            READY=0
-            for i in \$(seq 1 30); do
-                if curl -s http://localhost:8082/JSON/core/view/version/ >/dev/null; then
+
+            # 🔥 Chờ ZAP khởi động hoàn tất thay vì sleep cứng
+            for i in {1..30}; do
+                if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
                     echo "🚀 ZAP is ready!"
-                    READY=1
                     break
                 fi
-                echo "⏳ Still starting... retrying in 5sec (\$i/30)"
+                echo "⏳ Still starting... retrying in 5sec"
                 sleep 5
             done
 
-            if [ "$READY" -ne 1 ]; then
-                echo "❌ ZAP did not start → stopping job!"
-                docker logs zap-daemon
-                exit 1
-            fi
+            echo "🕷 Running Spider scan..."
+            curl "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
 
-            echo "🕷 Starting Spider scan..."
-            SCAN_ID=\$(curl -s "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000" | jq -r '.scan')
-
-            echo "⏳ Waiting for Spider scan to complete..."
-            while [ \$(curl -s "http://localhost:8082/JSON/spider/view/status/?scanId=\$SCAN_ID" | jq -r '.status') -lt 100 ]; do
-                echo "   → Spider progress: \$(curl -s "http://localhost:8082/JSON/spider/view/status/?scanId=\$SCAN_ID" | jq -r '.status')%"
-                sleep 5
-            done
-            echo "🕸 Spider completed!"
-
-            echo "⚡ Starting Active Scan..."
-            ACTIVE_ID=\$(curl -s "http://localhost:8082/JSON/ascan/action/scan/?url=http://localhost:3000" | jq -r '.scan')
-
-            echo "⏳ Waiting for Active Scan to complete..."
-            while [ \$(curl -s "http://localhost:8082/JSON/ascan/view/status/?scanId=\$ACTIVE_ID" | jq -r '.status') -lt 100 ]; do
-                echo "   → Active scan progress: \$(curl -s "http://localhost:8082/JSON/ascan/view/status/?scanId=\$ACTIVE_ID" | jq -r '.status')%"
-                sleep 8
-            done
-            echo "⚡ Active Scan completed!"
-
+            echo "⚡ Running Active scan..."
+            curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://localhost:3000"
+            
             echo "📄 Generating ZAP HTML report..."
             docker exec zap-daemon zap.sh \
                 -cmd -quickurl http://localhost:3000 \
                 -quickout /zap/wrk/zap-report.html
 
             echo "🛑 Stopping ZAP daemon..."
-            docker stop zap-daemon && docker rm zap-daemon
+            docker stop zap-daemon
+            docker rm zap-daemon
 
-            echo "📁 Reports saved in workspace:"
+            echo "📁 Report saved at: ${WORKSPACE}/zap-reports/"
             ls -lh ${WORKSPACE}/zap-reports
             """
         }
