@@ -163,47 +163,60 @@ pipeline {
             # Xóa container cũ nếu tồn tại
             docker rm -f zap-daemon || true
 
-            # Start ZAP daemon với network host
-            # Khởi động ZAP (daemon mode)
+            # Khởi động ZAP với API mở cho Jenkins (fix unhealthy + empty reply)
             docker run -d --name zap-daemon \
                 -u zap \
                 -p 8082:8082 \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
-                zaproxy/zap-stable \
-                zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
-            echo "⏳ Waiting for ZAP to be ready..."
+                zaproxy/zap-stable zap.sh -daemon \
+                -host 0.0.0.0 -port 8082 \
+                -config api.disablekey=true \
+                -config api.addrs.addr.name=.* \
+                -config api.addrs.addr.regex=true
 
-            # 🔥 Chờ ZAP khởi động hoàn tất thay vì sleep cứng
-            for i in {1..100}; do
+            echo "⏳ Waiting for ZAP to be ready..."
+            for i in {1..30}; do
                 if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
-                    echo "🚀 ZAP is ready!"
+                    echo "🚀 ZAP is running!"
                     break
                 fi
-                echo "⏳ Still starting... retrying in 5sec"
+                echo "⏳ ZAP not ready yet... retrying..."
                 sleep 5
             done
 
-            echo "🕷 Running Spider scan..."
-            curl "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
+            echo "🕷 Starting Spider Scan..."
+            SCANID=\$(curl -s "http://localhost:8082/JSON/spider/action/scan/?url=http://juice-app:3000" | jq -r .scan)
 
-            echo "⚡ Running Active scan..."
-            curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://localhost:3000"
-            
-            echo "📄 Generating ZAP HTML report..."
-            docker exec zap-daemon zap.sh \
-                -cmd -quickurl http://localhost:3000 \
-                -quickout /zap/wrk/zap-report.html
+            echo "⏳ Waiting Spider to complete..."
+            while [ "\$(curl -s http://localhost:8082/JSON/spider/view/status/?scanId=\$SCANID | jq -r .status)" != "100" ]; do
+                sleep 5
+            done
+            echo "🕸 Spider completed!"
 
-            echo "🛑 Stopping ZAP daemon..."
-            docker stop zap-daemon
-            docker rm zap-daemon
+            echo "⚡ Starting Active Scan..."
+            ASCANID=\$(curl -s "http://localhost:8082/JSON/ascan/action/scan/?url=http://juice-app:3000" | jq -r .scan)
 
-            echo "📁 Report saved at: ${WORKSPACE}/zap-reports/"
-            ls -lh ${WORKSPACE}/zap-reports
+            echo "⏳ Waiting Active Scan to complete..."
+            while [ "\$(curl -s http://localhost:8082/JSON/ascan/view/status/?scanId=\$ASCANID | jq -r .status)" != "100" ]; do
+                sleep 10
+            done
+            echo "⚡ Active Scan completed!"
+
+            echo "📄 Generating ZAP Reports..."
+            curl "http://localhost:8082/OTHER/core/other/htmlreport/" -o ${WORKSPACE}/zap-reports/zap-report.html
+            curl "http://localhost:8082/OTHER/core/other/xmlreport/" -o ${WORKSPACE}/zap-reports/zap-report.xml
+            curl "http://localhost:8082/OTHER/core/other/jsonreport/" -o ${WORKSPACE}/zap-reports/zap-report.json
+
+            echo "🛑 Cleaning ZAP container..."
+            docker stop zap-daemon && docker rm zap-daemon
+
+            echo "📁 Reports generated in workspace: ${WORKSPACE}/zap-reports"
+            ls -lah ${WORKSPACE}/zap-reports
             """
         }
     }
 }
+
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
