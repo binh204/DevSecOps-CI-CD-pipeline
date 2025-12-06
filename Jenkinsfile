@@ -165,8 +165,9 @@ pipeline {
 
             # Start ZAP daemon với network host
             # Khởi động ZAP (daemon mode)
-            docker run -d --name zap-daemon --network host \
+            docker run -d --name zap-daemon \
                 -u zap \
+                -p 8082:8082 \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
                 zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
