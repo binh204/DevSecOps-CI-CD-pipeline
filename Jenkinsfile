@@ -14,7 +14,7 @@ pipeline {
     }
     
     stages {
-    /*
+    
         // 1️⃣ Checkout code
         stage('Checkout') {
             steps {
@@ -122,7 +122,7 @@ pipeline {
                 }
             }
         }
-      */
+      
         // 8️⃣ Build Docker Image
         stage('Build Docker Image') {
             steps {
