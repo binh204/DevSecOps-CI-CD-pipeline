@@ -161,7 +161,7 @@ mkdir -p $WORKSPACE/zap-reports
 docker rm -f zap-daemon || true
 
 docker run -d --name zap-daemon \
-    -p 8082:8080 \
+    -p 8080:8080 \
     -v $WORKSPACE/zap-reports:/zap/wrk \
     zaproxy/zap-stable zap.sh -daemon \
     -port 8080 \
@@ -178,13 +178,13 @@ done
 echo "🔥 READY"
 
 echo "🕷 Spider Scan"
-curl "http://localhost:8082/JSON/spider/action/scan/?url=http://host.docker.internal:3000&recurse=true"
+curl "http://localhost:8080/JSON/spider/action/scan/?url=http://host.docker.internal:3000&recurse=true"
 
 echo "⚡ Active Scan"
-curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://host.docker.internal:3000"
+curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://host.docker.internal:3000"
 
 echo "📄 Generate Report"
-curl "http://localhost:8082/OTHER/core/other/htmlreport/" \
+curl "http://localhost:8080/OTHER/core/other/htmlreport/" \
     --output $WORKSPACE/zap-reports/zap-report.html
 
 docker stop zap-daemon && docker rm zap-daemon
