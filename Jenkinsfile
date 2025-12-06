@@ -155,7 +155,7 @@ pipeline {
     stage('ZAP Crawl & Active Scan') {
     steps {
         script {
-            sh """
+            sh script: """
             echo "🛡 Starting OWASP ZAP daemon..."
 
             mkdir -p ${WORKSPACE}/zap-reports
