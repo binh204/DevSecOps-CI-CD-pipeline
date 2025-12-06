@@ -160,22 +160,22 @@ pipeline {
 
             mkdir -p ${WORKSPACE}/zap-reports
 
-            # Xóa container cũ nếu tồn tại
+            # Xóa container ZAP cũ
             docker rm -f zap-daemon || true
 
-            # Start ZAP daemon với network host
-            # Khởi động ZAP (daemon mode)
+            # Khởi chạy ZAP daemon
             docker run -d --name zap-daemon \
                 -u zap \
                 -p 8082:8082 \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
                 zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
+
             echo "⏳ Waiting for ZAP to be ready..."
 
-            # 🔥 Chờ ZAP khởi động hoàn tất thay vì sleep cứng
+            # Chờ ZAP boot (tối đa 30 lần x 5s)
             for i in {1..30}; do
-                if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
+                if curl -s http://172.17.0.5:8082/JSON/core/view/version/ >/dev/null; then
                     echo "🚀 ZAP is ready!"
                     break
                 fi
@@ -184,14 +184,14 @@ pipeline {
             done
 
             echo "🕷 Running Spider scan..."
-            curl "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
+            curl "http://172.17.0.5:8082/JSON/spider/action/scan/?url=http://172.17.0.1:3000&recurse=true"
 
-            echo "⚡ Running Active scan..."
-            curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://localhost:3000"
-            
+            echo "⚡ Running Active Scan..."
+            curl "http://172.17.0.5:8082/JSON/ascan/action/scan/?url=http://172.17.0.1:3000"
+
             echo "📄 Generating ZAP HTML report..."
             docker exec zap-daemon zap.sh \
-                -cmd -quickurl http://localhost:3000 \
+                -cmd -quickurl http://172.17.0.1:3000 \
                 -quickout /zap/wrk/zap-report.html
 
             echo "🛑 Stopping ZAP daemon..."
@@ -204,6 +204,7 @@ pipeline {
         }
     }
 }
+
 
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
