@@ -174,7 +174,7 @@ pipeline {
             echo "⏳ Waiting for ZAP to be ready..."
 
             # 🔥 Chờ ZAP khởi động hoàn tất thay vì sleep cứng
-            for i in {1..30}; do
+            for i in {1..100}; do
                 if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
                     echo "🚀 ZAP is ready!"
                     break
