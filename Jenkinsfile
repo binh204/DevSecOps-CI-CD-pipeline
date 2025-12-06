@@ -151,7 +151,8 @@ pipeline {
                 }
             }
 
-        stage('ZAP Crawl & Active Scan') {
+        // Run ZAP
+       stage('ZAP Crawl & Active Scan') {
     steps {
         script {
             sh """
@@ -160,7 +161,6 @@ pipeline {
             mkdir -p ${WORKSPACE}/zap-reports
             docker rm -f zap-daemon || true
 
-            # Khởi động ZAP (daemon mode)
             docker run -d --name zap-daemon --network host \
                 -u zap \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
@@ -168,16 +168,22 @@ pipeline {
                 zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
 
             echo "⏳ Waiting for ZAP to be ready..."
-
-            # 🔥 Chờ ZAP khởi động hoàn tất thay vì sleep cứng
+            READY=0
             for i in {1..30}; do
                 if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
                     echo "🚀 ZAP is ready!"
+                    READY=1
                     break
                 fi
-                echo "⏳ Still starting... retrying in 5sec"
+                echo "⏳ Still starting... retrying in 5sec ($i/30)"
                 sleep 5
             done
+
+            if [ "$READY" -ne 1 ]; then
+                echo "❌ ZAP did not start → stopping job!"
+                docker logs zap-daemon
+                exit 1
+            fi
 
             echo "🕷 Running Spider scan..."
             curl "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
@@ -191,10 +197,9 @@ pipeline {
                 -quickout /zap/wrk/zap-report.html
 
             echo "🛑 Stopping ZAP daemon..."
-            docker stop zap-daemon
-            docker rm zap-daemon
+            docker stop zap-daemon && docker rm zap-daemon
 
-            echo "📁 Report saved at: ${WORKSPACE}/zap-reports/"
+            echo "📁 Reports saved in workspace:"
             ls -lh ${WORKSPACE}/zap-reports
             """
         }
