@@ -162,7 +162,7 @@ pipeline {
             docker rm -f zap-daemon || true
 
             docker run -d --name zap-daemon \
-                -p 8082:8080 \               # <-- LƯU Ý PORT THẬT CỦA API LÀ 8080
+                -p 8082:8080 \    
                 -v $WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
                 zap.sh -daemon -port 8080 -host 0.0.0.0 -config api.disablekey=true
