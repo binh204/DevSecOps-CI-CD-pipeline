@@ -168,16 +168,14 @@ pipeline {
     -u root \
     -p 8082:8082 \
     -v ${WORKSPACE}/zap-reports:/zap/wrk \
-    zaproxy/zap-stable /bin/sh -c "\
+    zaproxy/zap-stable /bin/sh -c '
         apk update && apk add jq && \
         zap.sh -daemon \
         -host 0.0.0.0 -port 8082 \
         -config api.disablekey=true \
         -config api.addrs.addr.name=.* \
-        -config api.addrs.addr.regex=true \
-    "
-
-
+        -config api.addrs.addr.regex=true
+    '
             echo "⏳ Waiting for ZAP to be ready..."
             for i in {1..30}; do
                 if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
