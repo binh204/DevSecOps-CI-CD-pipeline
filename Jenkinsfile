@@ -163,59 +163,43 @@ pipeline {
             # Xóa container cũ nếu tồn tại
             docker rm -f zap-daemon || true
 
-            # Start ZAP daemon với network của host để có thể kết nối tới localhost:3000
+            # Start ZAP daemon với network host
+            # Khởi động ZAP (daemon mode)
             docker run -d --name zap-daemon \
-                --network="host" \
                 -u zap \
+                -p 8082:8082 \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
                 zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
-            
             echo "⏳ Waiting for ZAP to be ready..."
 
-            # Đợi ZAP khởi động
-            sleep 10
-            
-            # 🔥 Chờ ZAP khởi động hoàn tất
+            # 🔥 Chờ ZAP khởi động hoàn tất thay vì sleep cứng
             for i in {1..30}; do
-                if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null 2>&1; then
+                if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
                     echo "🚀 ZAP is ready!"
                     break
                 fi
                 echo "⏳ Still starting... retrying in 5sec"
                 sleep 5
-                
-                if [ \$i -eq 30 ]; then
-                    echo "❌ ZAP failed to start after 150 seconds"
-                    docker logs zap-daemon
-                    exit 1
-                fi
             done
 
             echo "🕷 Running Spider scan..."
-            curl -s "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
+            curl "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
 
-            # Chờ spider scan hoàn thành
-            sleep 30
-            
             echo "⚡ Running Active scan..."
-            curl -s "http://localhost:8082/JSON/ascan/action/scan/?url=http://localhost:3000"
-            
-            # Chờ active scan hoàn thành
-            sleep 60
+            curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://localhost:3000"
             
             echo "📄 Generating ZAP HTML report..."
             docker exec zap-daemon zap.sh \
                 -cmd -quickurl http://localhost:3000 \
-                -quickprogress \
                 -quickout /zap/wrk/zap-report.html
 
             echo "🛑 Stopping ZAP daemon..."
-            docker stop zap-daemon || true
-            docker rm zap-daemon || true
+            docker stop zap-daemon
+            docker rm zap-daemon
 
             echo "📁 Report saved at: ${WORKSPACE}/zap-reports/"
-            ls -lh ${WORKSPACE}/zap-reports/
+            ls -lh ${WORKSPACE}/zap-reports
             """
         }
     }
