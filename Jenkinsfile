@@ -169,13 +169,13 @@ pipeline {
 
             echo "⏳ Waiting for ZAP to be ready..."
             READY=0
-            for i in {1..30}; do
-                if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
+            for i in \$(seq 1 30); do
+                if curl -s http://localhost:8082/JSON/core/view/version/ >/dev/null; then
                     echo "🚀 ZAP is ready!"
                     READY=1
                     break
                 fi
-                echo "⏳ Still starting... retrying in 5sec ($i/30)"
+                echo "⏳ Still starting... retrying in 5sec (\$i/30)"
                 sleep 5
             done
 
@@ -185,11 +185,25 @@ pipeline {
                 exit 1
             fi
 
-            echo "🕷 Running Spider scan..."
-            curl "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
+            echo "🕷 Starting Spider scan..."
+            SCAN_ID=\$(curl -s "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000" | jq -r '.scan')
 
-            echo "⚡ Running Active scan..."
-            curl "http://localhost:8082/JSON/ascan/action/scan/?url=http://localhost:3000"
+            echo "⏳ Waiting for Spider scan to complete..."
+            while [ \$(curl -s "http://localhost:8082/JSON/spider/view/status/?scanId=\$SCAN_ID" | jq -r '.status') -lt 100 ]; do
+                echo "   → Spider progress: \$(curl -s "http://localhost:8082/JSON/spider/view/status/?scanId=\$SCAN_ID" | jq -r '.status')%"
+                sleep 5
+            done
+            echo "🕸 Spider completed!"
+
+            echo "⚡ Starting Active Scan..."
+            ACTIVE_ID=\$(curl -s "http://localhost:8082/JSON/ascan/action/scan/?url=http://localhost:3000" | jq -r '.scan')
+
+            echo "⏳ Waiting for Active Scan to complete..."
+            while [ \$(curl -s "http://localhost:8082/JSON/ascan/view/status/?scanId=\$ACTIVE_ID" | jq -r '.status') -lt 100 ]; do
+                echo "   → Active scan progress: \$(curl -s "http://localhost:8082/JSON/ascan/view/status/?scanId=\$ACTIVE_ID" | jq -r '.status')%"
+                sleep 8
+            done
+            echo "⚡ Active Scan completed!"
 
             echo "📄 Generating ZAP HTML report..."
             docker exec zap-daemon zap.sh \
@@ -205,6 +219,7 @@ pipeline {
         }
     }
 }
+
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
