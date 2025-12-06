@@ -10,7 +10,7 @@ pipeline {
         DEFECTDOJO_API_KEY = credentials('defectdojo-api')
 
         DEFECTDOJO_URL = 'http://192.168.73.36:8080'
-        DEFECTDOJO_ENGAGEMENT_ID = '1'
+        DEFECTDOJO_ENGAGEMENT_ID = '2'
     }
     
     stages {
