@@ -170,19 +170,24 @@ pipeline {
                 -p 8082:8082 \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
-                zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
+                zap.sh -daemon -host 0.0.0.0 -port 8082 \
+                -config api.disablekey=true
+                -config autoupdate.addoninstall=false \
+                -config autoupdate.checkaddonupdates=false \
+                -config autoupdate.checkonstart=false
             echo "⏳ Waiting for ZAP to be ready..."
 
-            # 🔥 Chờ ZAP khởi động hoàn tất thay vì sleep cứng
-            for i in {1..30}; do
-                if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
-                    echo "🚀 ZAP is ready!"
+            echo "⏳ Waiting for ZAP API..."
+                for i in {1..40}; do
+                    STATUS=$(curl -s http://localhost:8082/JSON/core/view/version/ | jq -r '.version' 2>/dev/null)
+                    if [[ "$STATUS" != "null" && "$STATUS" != "" ]]; then
+                        echo "🚀 ZAP ready! Version: $STATUS"
                     break
-                fi
-                echo "⏳ Still starting... retrying in 5sec"
-                sleep 5
-            done
-
+                    fi
+                echo "⏳ ZAP not ready yet... retry in 5s"
+                    sleep 5
+                done
+                
             echo "🕷 Running Spider scan..."
             curl "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
 
