@@ -155,7 +155,7 @@ pipeline {
     stage('ZAP Crawl & Active Scan') {
     steps {
         script {
-            sh script: """
+            sh """
             echo "🛡 Starting OWASP ZAP daemon..."
 
             mkdir -p ${WORKSPACE}/zap-reports
@@ -170,24 +170,19 @@ pipeline {
                 -p 8082:8082 \
                 -v ${WORKSPACE}/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
-                zap.sh -daemon -host 0.0.0.0 -port 8082 \
-                -config api.disablekey=true \
-                -config autoupdate.addoninstall=false \
-                -config autoupdate.checkaddonupdates=false \
-                -config autoupdate.checkonstart=false
+                zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
             echo "⏳ Waiting for ZAP to be ready..."
 
-            echo "⏳ Waiting for ZAP API..."
-                for i in {1..40}; do
-                    STATUS=$(curl -s http://localhost:8082/JSON/core/view/version/ | jq -r '.version' 2>/dev/null)
-                    if [[ "$STATUS" != "null" && "$STATUS" != "" ]]; then
-                        echo "🚀 ZAP ready! Version: $STATUS"
+            # 🔥 Chờ ZAP khởi động hoàn tất thay vì sleep cứng
+            for i in {1..30}; do
+                if curl -s http://localhost:8082/JSON/core/view/version/ > /dev/null; then
+                    echo "🚀 ZAP is ready!"
                     break
-                    fi
-                echo "⏳ ZAP not ready yet... retry in 5s"
-                    sleep 5
-                done
-                
+                fi
+                echo "⏳ Still starting... retrying in 5sec"
+                sleep 5
+            done
+
             echo "🕷 Running Spider scan..."
             curl "http://localhost:8082/JSON/spider/action/scan/?url=http://localhost:3000"
 
@@ -209,7 +204,6 @@ pipeline {
         }
     }
 }
-
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
