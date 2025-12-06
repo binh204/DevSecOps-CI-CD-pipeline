@@ -158,37 +158,35 @@ pipeline {
             sh """
             echo "🛡 Starting OWASP ZAP daemon..."
 
-            mkdir -p ${WORKSPACE}/zap-reports
+            mkdir -p $WORKSPACE/zap-reports
 
             docker rm -f zap-daemon || true
 
             docker run -d --name zap-daemon \
                 -u zap \
                 -p 8082:8082 \
-                -v ${WORKSPACE}/zap-reports:/zap/wrk \
+                -v $WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
                 zap.sh -daemon -host 0.0.0.0 -port 8082 -config api.disablekey=true
 
-            # --- Lấy IP động thay thế hardcode ---
-            ZAP_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' zap-daemon)
-            echo "📡 ZAP running at: http://$ZAP_IP:8082"
+            ZAP_IP=\$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' zap-daemon)
+            echo "📡 ZAP running at: http://\$ZAP_IP:8082"
 
             echo "⏳ Checking ZAP availability..."
-            # Chờ tối đa 3 phút cho tới khi Zap API phản hồi
             for i in {1..36}; do
-                if curl -s "http://$ZAP_IP:8082/JSON/core/view/version/" >/dev/null; then
+                if curl -s "http://\$ZAP_IP:8082/JSON/core/view/version/" > /dev/null; then
                     echo "🚀 ZAP is ready!"
                     break
                 fi
-                echo "⏳ ZAP starting... ($i/36)"
+                echo "⏳ ZAP starting... (\$i/36)"
                 sleep 5
             done
 
             echo "🕷 Running Spider scan..."
-            curl "http://$ZAP_IP:8082/JSON/spider/action/scan/?url=http://172.17.0.1:3000&recurse=true"
+            curl "http://\$ZAP_IP:8082/JSON/spider/action/scan/?url=http://172.17.0.1:3000&recurse=true"
 
             echo "⚡ Running Active Scan..."
-            curl "http://$ZAP_IP:8082/JSON/ascan/action/scan/?url=http://172.17.0.1:3000"
+            curl "http://\$ZAP_IP:8082/JSON/ascan/action/scan/?url=http://172.17.0.1:3000"
 
             echo "📄 Generating ZAP report..."
             docker exec zap-daemon zap.sh -cmd \
@@ -198,8 +196,8 @@ pipeline {
             echo "🛑 Stopping ZAP..."
             docker stop zap-daemon && docker rm zap-daemon
 
-            echo "📁 Report saved: ${WORKSPACE}/zap-reports/"
-            ls -lh ${WORKSPACE}/zap-reports
+            echo "📁 Report saved: $WORKSPACE/zap-reports/"
+            ls -lh $WORKSPACE/zap-reports
             """
         }
     }
