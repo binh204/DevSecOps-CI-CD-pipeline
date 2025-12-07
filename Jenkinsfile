@@ -168,16 +168,13 @@ pipeline {
             mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
 
-            # ⚠ Thêm API key
-            ZAP_API_KEY="MySecureKey123"
-
             docker run -d --name zap-daemon \
                 --network host \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0 \
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true \
-                -config api.key=$ZAP_API_KEY
+                -config api.disablekey=true
 
             echo "⏳ Wait ZAP REST API ready..."
             for i in $(seq 1 60); do
@@ -189,14 +186,14 @@ pipeline {
             done
 
             echo "🕷 Spidering..."
-            curl "http://localhost:8080/JSON/spider/action/scan/?apikey=$ZAP_API_KEY&url=http://localhost:3000&recurse=true"
+            curl "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
 
             echo "⚡ Active Scan..."
-            curl "http://localhost:8080/JSON/ascan/action/scan/?apikey=$ZAP_API_KEY&url=http://localhost:3000"
+            curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
 
             echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
-            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=$ZAP_API_KEY" \
-                --output $WORKSPACE/zap-reports/zap-report.xml
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=" \
+                --output $WORKSPACE/zap-reports/zap-report.html
 
             docker stop zap-daemon && docker rm zap-daemon
             echo "📁 Report saved to workspace/zap-reports"
@@ -205,32 +202,21 @@ pipeline {
         }
     }
 }
-
         
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
     steps {
         script {
-
-            ZAP_API_KEY="MySecureKey123"
-
-            echo "📄 Export ZAP XML report đúng format để upload vào DefectDojo"
-            curl "http://localhost:8080/OTHER/core/other/xmlreport/?apikey=${ZAP_API_KEY}" \
-                --output ${WORKSPACE}/zap-reports/zap-full-report.xml
-
-
-            echo "🚀 Upload to DefectDojo"
             sh """
             curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
-                -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
-                -F 'scan_type=ZAP Scan' \
-                -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
-                -F 'file=@${WORKSPACE}/zap-reports/zap-full-report.xml'
+                 -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                 -F 'scan_type=ZAP Scan' \
+                 -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                 -F 'file=@${WORKSPACE}/zap-reports/zap-report.html'
             """
         }
     }
 }
-
         }
     post {
         success { echo '✅ Pipeline completed successfully!' }
