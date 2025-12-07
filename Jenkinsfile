@@ -11,7 +11,7 @@ pipeline {
         DEFECTDOJO_URL = 'http://192.168.73.36:8080'
         DEFECTDOJO_ENGAGEMENT_ID = '2'
     }
-    
+    /*
     stages {
     
         // 1️⃣ Checkout code
@@ -121,7 +121,7 @@ pipeline {
                 }
             }
         }
-      
+      */
         // 8️⃣ Build Docker Image
         stage('Build Docker Image') {
             steps {
@@ -212,7 +212,7 @@ stage('Upload ZAP Report to DefectDojo') {
                  -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
                  -F 'scan_type=ZAP Scan' \
                  -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
-                 -F 'file=@${WORKSPACE}/zap-reports/zap-report.html'
+                 -F 'file=@${WORKSPACE}/zap-reports/zap-report.xml'
             """
         }
     }
