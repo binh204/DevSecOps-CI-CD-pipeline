@@ -127,11 +127,6 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    echo "🧹 Cleaning up old Docker images..."
-                        // Xóa các image cũ của juice-shop
-                        sh '''
-                            docker images -q juice-shop | xargs -r docker rmi -f
-                        '''
                     echo "🚀 Building Docker image from Juice Shop source..."
                     dockerImage = docker.build(
                         "juice-shop:${env.BUILD_NUMBER}",
@@ -145,11 +140,19 @@ pipeline {
         stage('Run Juice Shop Container') {
             steps {
                 script {
+                    echo "🧹 Cleaning up previous Docker image..."
+                        // Tính build trước đó
+                        def previousBuild = env.BUILD_NUMBER.toInteger() - 1
+                        if (previousBuild > 0) {
+                        sh "docker rmi -f juice-shop:${previousBuild} || true"
+                        }
+ 
                     echo "🏃 Running container from image..."
                     sh '''
                         docker stop juice-app || true
                         docker rm juice-app || true
                     '''
+            
                     sh "docker run -d --name juice-app -p 3000:3000 juice-shop:${BUILD_NUMBER}"
                     sleep 25
                     }
