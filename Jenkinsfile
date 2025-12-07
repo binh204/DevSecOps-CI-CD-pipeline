@@ -169,7 +169,7 @@ pipeline {
             docker rm -f zap-daemon || true
 
             docker run -d --name zap-daemon \
-    --network host \
+    -p 8090:8090 \
     -v $WORKSPACE/zap-reports:/zap/wrk \
     zaproxy/zap-stable \
     zap.sh -daemon \
@@ -177,7 +177,6 @@ pipeline {
     -config api.disablekey=true \
     -config api.addrs.addr.name=.* \
     -config api.addrs.addr.regex=true
-
             
             echo "⏳ Wait ZAP REST API ready..."
             for i in $(seq 1 60); do
