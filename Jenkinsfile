@@ -202,21 +202,6 @@ pipeline {
         }
     }
 }
-        
-// 2️⃣ Stage: Upload ZAP report to DefectDojo
-stage('Upload ZAP Report to DefectDojo') {
-    steps {
-        script {
-            sh """
-            curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
-                 -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
-                 -F 'scan_type=ZAP Scan' \
-                 -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
-                 -F 'file=@${WORKSPACE}/zap-reports/zap-report.html'
-            """
-        }
-    }
-}
  
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
