@@ -163,28 +163,20 @@ pipeline {
     steps {
         script {
             sh '''
-            echo "🛡 Start OWASP ZAP Daemon (with Docker network)"
+            echo "🛡 Start OWASP ZAP Daemon MODE (host network)"
 
             mkdir -p $WORKSPACE/zap-reports
+            docker rm -f zap-daemon || true
 
-            # Create dedicated network for Juice Shop and ZAP
-            docker network create zap-net || true
-
-            # Remove any old containers
-            docker rm -f zap-daemon juice-app || true
-
-            # Run Juice Shop container on zap-net
-            docker run -d --name juice-app --network zap-net -p 3000:3000 juice-shop:${BUILD_NUMBER}
-
-            # Run ZAP daemon on same network
-            docker run -d --name zap-daemon --network zap-net \
+            docker run -d --name zap-daemon \
+                --network host \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0 \
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true \
                 -config api.disablekey=true
 
-            echo "⏳ Wait for ZAP REST API ready..."
+            echo "⏳ Wait ZAP REST API ready..."
             for i in $(seq 1 60); do
                 if curl -s http://localhost:8080/JSON/core/view/version/ > /dev/null; then
                     echo "🔥 ZAP API Ready!"
@@ -193,39 +185,39 @@ pipeline {
                 sleep 2
             done
 
-            echo "🕷 Start Spidering..."
-            SPIDER_ID=$(curl -s "http://localhost:8080/JSON/spider/action/scan/?url=http://juice-app:3000&recurse=true" | jq -r .scan)
-            while true; do
-                STATUS=$(curl -s "http://localhost:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | jq -r .status)
-                echo "Spider progress: $STATUS%"
-                [ "$STATUS" -eq 100 ] && break
-                sleep 2
-            done
+            echo "🕷 Spidering..."
+            curl "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
 
-            echo "⚡ Start Active Scan..."
-            ASCAN_ID=$(curl -s "http://localhost:8080/JSON/ascan/action/scan/?url=http://juice-app:3000" | jq -r .scan)
-            while true; do
-                STATUS=$(curl -s "http://localhost:8080/JSON/ascan/view/status/?scanId=$ASCAN_ID" | jq -r .status)
-                echo "Active Scan progress: $STATUS%"
-                [ "$STATUS" -eq 100 ] && break
-                sleep 5
-            done
+            echo "⚡ Active Scan..."
+            curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
 
-            echo "📄 Export ZAP XML report"
-            curl "http://localhost:8080/OTHER/core/other/xmlreport/?apikey=" \
-                --output $WORKSPACE/zap-reports/zap-report.xml
+            echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=" \
+                --output $WORKSPACE/zap-reports/zap-report.html
 
-            docker stop zap-daemon juice-app
-            docker rm zap-daemon juice-app
+            docker stop zap-daemon && docker rm zap-daemon
             echo "📁 Report saved to workspace/zap-reports"
             ls -lh $WORKSPACE/zap-reports
             '''
         }
     }
 }
-
-          
         
+// 2️⃣ Stage: Upload ZAP report to DefectDojo
+stage('Upload ZAP Report to DefectDojo') {
+    steps {
+        script {
+            sh """
+            curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
+                 -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                 -F 'scan_type=ZAP Scan' \
+                 -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                 -F 'file=@${WORKSPACE}/zap-reports/zap-report.html'
+            """
+        }
+    }
+}
+ 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
     steps {
