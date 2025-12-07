@@ -127,6 +127,11 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
+                    echo "🧹 Cleaning up old Docker images..."
+                        // Xóa các image cũ của juice-shop
+                        sh '''
+                            docker images -q juice-shop | xargs -r docker rmi -f
+                        '''
                     echo "🚀 Building Docker image from Juice Shop source..."
                     dockerImage = docker.build(
                         "juice-shop:${env.BUILD_NUMBER}",
