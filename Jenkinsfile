@@ -10,7 +10,6 @@ pipeline {
 
         DEFECTDOJO_URL = 'http://192.168.73.36:8080'
         DEFECTDOJO_ENGAGEMENT_ID = '2'
-        ZAP_API_KEY = 'binh204'
     }
     
     stages {
@@ -168,6 +167,8 @@ pipeline {
 
             mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
+
+            ZAP_API_KEY = 'binh204'
 
             docker run -d --name zap-daemon \
                 --network host \
