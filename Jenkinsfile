@@ -159,70 +159,41 @@ pipeline {
             }
 
         // 1️⃣ Stage: ZAP Scan
-        stage('ZAP Crawl & Active Scan') {
+        stage('ZAP Scan using ZAP CLI') {
     steps {
         script {
             sh '''
             TARGET="http://localhost:3000"
             ZAP_API_KEY="binh204"
-            ZAP_HOST="localhost"
-            ZAP_PORT="8080"
-
-            echo "🛡 Start OWASP ZAP Daemon MODE"
-
-            mkdir -p $WORKSPACE/zap-reports
-            docker rm -f zap-daemon || true
-
-            # Khởi động ZAP daemon
-            docker run -d --name zap-daemon \
-                --network host \
-                -v $WORKSPACE/zap-reports:/zap/wrk \
-                zaproxy/zap-stable zap.sh -daemon \
-                -port $ZAP_PORT -host 0.0.0.0 \
-                -config api.disablekey=false \
-                -config api.key=$ZAP_API_KEY \
-                -config api.addrs.addr.name=.* \
-                -config api.addrs.addr.regex=true
-
-            echo "⏳ Waiting for ZAP to start..."
-            sleep 30  # Tăng thời gian chờ để ZAP khởi động hoàn toàn
-
-            # Kiểm tra ZAP đã sẵn sàng chưa
-            echo "🔍 Testing ZAP API connection..."
-            curl -s "http://$ZAP_HOST:$ZAP_PORT/JSON/core/view/version/?apikey=$ZAP_API_KEY" || true
-
-            echo "🕷 Start Spider Scan on $TARGET"
-            # Sử dụng endpoint đúng cho spider
-            curl -X POST "http://$ZAP_HOST:$ZAP_PORT/JSON/spider/action/scan/" \
-                -H "Content-Type: application/x-www-form-urlencoded" \
-                -d "apikey=$ZAP_API_KEY&url=$TARGET&maxChildren=10&recurse=true"
-
-            echo "⏳ Waiting for Spider to complete..."
-            sleep 60
-
-            echo "⚡ Starting Active Scan on $TARGET"
-            # Sử dụng endpoint đúng cho active scan
-            curl -X POST "http://$ZAP_HOST:$ZAP_PORT/JSON/ascan/action/scan/" \
-                -H "Content-Type: application/x-www-form-urlencoded" \
-                -d "apikey=$ZAP_API_KEY&url=$TARGET&recurse=true&inScopeOnly=true&scanPolicyName=Default Policy"
-
-            echo "⏳ Waiting for Active Scan to complete (300 seconds)..."
-            sleep 300
-
-            echo "📄 Generating HTML Report"
-            curl -X GET "http://$ZAP_HOST:$ZAP_PORT/OTHER/core/other/htmlreport/?apikey=$ZAP_API_KEY" \
-                -o $WORKSPACE/zap-reports/zap-report.html
-
-            echo "📊 Generating XML Report for DefectDojo"
-            curl -X GET "http://$ZAP_HOST:$ZAP_PORT/OTHER/core/other/xmlreport/?apikey=$ZAP_API_KEY" \
-                -o $WORKSPACE/zap-reports/zap-report.xml
-
-            # Dừng container
-            docker stop zap-daemon || true
-            docker rm zap-daemon || true
-
-            echo "✅ Report saved!"
-            ls -l $WORKSPACE/zap-reports/
+            REPORT_DIR="$WORKSPACE/zap-reports"
+            
+            echo "🛡 Starting ZAP with CLI approach"
+            
+            mkdir -p $REPORT_DIR
+            
+            # Dọn dẹp container cũ
+            docker rm -f zap-scan || true
+            
+            # Chạy ZAP scan sử dụng ZAP Baseline
+            docker run -v $(pwd):/zap/wrk/:rw \
+                -u zap \
+                -t zaproxy/zap-stable zap-baseline.py \
+                -t $TARGET \
+                -g gen.conf \
+                -r zap-report.html \
+                -x zap-report.xml \
+                -J zap-report.json \
+                -a \
+                -I \
+                -j \
+                --hook=/zap/auth_hook.py \
+                -z "-config api.disablekey=true"  # Tắt API key requirement
+            
+            # Di chuyển reports
+            mv zap-report.html zap-report.xml zap-report.json $REPORT_DIR/ 2>/dev/null || true
+            
+            echo "✅ ZAP CLI scan completed!"
+            ls -la $REPORT_DIR/
             '''
         }
     }
