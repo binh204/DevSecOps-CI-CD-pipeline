@@ -176,7 +176,6 @@ pipeline {
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true \
                 -config api.disablekey=false \
-                -config api.enable=true \
                 -config api.key=$ZAP_API_KEY 
 
             echo "⏳ Wait ZAP REST API ready..."
