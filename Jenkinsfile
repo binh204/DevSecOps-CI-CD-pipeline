@@ -189,12 +189,11 @@ pipeline {
 
             echo "🕷 Spidering..."
             curl -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-             "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000"
-
-
+            "http://localhost:8080/JSON/spider/action/scan/?apikey=$ZAP_API_KEY&url=http://localhost:3000"
+            
             echo "⚡ Active Scan..."
             curl -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-             "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
+             "http://localhost:8080/JSON/ascan/action/scan/?apikey=$ZAP_API_KEY&url=http://localhost:3000"
 
             echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
             curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=$ZAP_API_KEY&" \
