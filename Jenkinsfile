@@ -10,6 +10,7 @@ pipeline {
 
         DEFECTDOJO_URL = 'http://192.168.73.36:8080'
         DEFECTDOJO_ENGAGEMENT_ID = '2'
+        ZAP_API_KEY = 'binh204'
     }
     
     stages {
@@ -175,6 +176,7 @@ pipeline {
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true \
                 -config api.disablekey=true
+                -config api.key=$ZAP_API_KEY
 
             echo "⏳ Wait ZAP REST API ready..."
             for i in $(seq 1 60); do
@@ -186,13 +188,13 @@ pipeline {
             done
 
             echo "🕷 Spidering..."
-            curl "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
+            curl "http://localhost:8080/JSON/spider/action/scan/?apikey=$ZAP_API_KEY&url=http://localhost:3000&recurse=true"
 
             echo "⚡ Active Scan..."
-            curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
+            curl "http://localhost:8080/JSON/ascan/action/scan/?apikey=$ZAP_API_KEY&url=http://localhost:3000"
 
             echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
-            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=" \
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=$ZAP_API_KEY&" \
                 --output $WORKSPACE/zap-reports/zap-report.html
 
             docker stop zap-daemon && docker rm zap-daemon
