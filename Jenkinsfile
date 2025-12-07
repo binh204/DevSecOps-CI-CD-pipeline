@@ -163,50 +163,48 @@ pipeline {
     steps {
         script {
             sh '''
-            echo "🛡 Start OWASP ZAP Daemon MODE (host network)"
+            ZAP_API_KEY="binh204"
+            TARGET="http://localhost:3000"
+
+            echo "🛡 Start OWASP ZAP Daemon MODE"
 
             mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
 
-            ZAP_API_KEY='binh204'
-
             docker run -d --name zap-daemon \
                 --network host \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
-                zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0 \
-                -config api.addrs.addr.name=.* \
-                -config api.addrs.addr.regex=true \
+                zaproxy/zap-stable zap.sh -daemon \
+                -port 8080 -host 0.0.0.0 \
+                -config api.key=$ZAP_API_KEY \
                 -config api.disablekey=false \
-                -config api.key=$ZAP_API_KEY 
+                -config api.addrs.addr.name=.* \
+                -config api.addrs.addr.regex=true
 
-            echo "⏳ Wait ZAP REST API ready..."
-            for i in $(seq 1 60); do
-                if curl -s http://localhost:8080/JSON/core/view/version/ > /dev/null; then
-                    echo "🔥 ZAP API Ready!"
-                    break
-                fi
-                sleep 2
-            done
+            echo "⏳ Waiting for ZAP..."
+            sleep 10
 
-            echo "🕷 Spidering..."
-            curl -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-            "http://localhost:8080/JSON/spider/action/scan/?apikey=$ZAP_API_KEY&url=http://localhost:3000"
-            
-            echo "⚡ Active Scan..."
-            curl -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-             "http://localhost:8080/JSON/ascan/action/scan/?apikey=$ZAP_API_KEY&url=http://localhost:3000"
+            echo "🕷 Start Spider"
+            curl -X GET "http://localhost:8080/JSON/spider/action/scan/?apikey=$ZAP_API_KEY&url=$TARGET" \
+                -H "X-ZAP-API-Key:$ZAP_API_KEY"
 
-            echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
-            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=$ZAP_API_KEY&" \
-                --output $WORKSPACE/zap-reports/zap-report.xml
+            echo "⚡ Active Scan"
+            curl -X GET "http://localhost:8080/JSON/ascan/action/scan/?apikey=$ZAP_API_KEY&url=$TARGET" \
+                -H "X-ZAP-API-Key:$ZAP_API_KEY"
+
+            echo "📄 Generate Report"
+            curl -X GET "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=$ZAP_API_KEY" \
+                -H "X-ZAP-API-Key:$ZAP_API_KEY" \
+                --output $WORKSPACE/zap-reports/zap.html
 
             docker stop zap-daemon && docker rm zap-daemon
-            echo "📁 Report saved to workspace/zap-reports"
-            ls -lh $WORKSPACE/zap-reports
+            echo "Report saved!"
+            ls -l $WORKSPACE/zap-reports
             '''
         }
     }
 }
+
         
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
