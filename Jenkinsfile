@@ -163,7 +163,6 @@ pipeline {
     steps {
         script {
             sh '''
-            ZAP_API_KEY="binh204"
             TARGET="http://localhost:3000"
 
             echo "🛡 Start OWASP ZAP Daemon MODE"
@@ -176,7 +175,7 @@ pipeline {
                 -v $WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable zap.sh -daemon \
                 -port 8080 -host 0.0.0.0 \
-                -config api.key=$ZAP_API_KEY \
+                -config api.key=binh204 \
                 -config api.disablekey=false \
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true
@@ -185,16 +184,16 @@ pipeline {
             sleep 10
 
             echo "🕷 Start Spider"
-            curl -X GET "http://localhost:8080/JSON/spider/action/scan/?apikey=$ZAP_API_KEY&url=$TARGET" \
+            curl -X GET "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204&url=$TARGET" \
                 -H "X-ZAP-API-Key:$ZAP_API_KEY"
 
             echo "⚡ Active Scan"
-            curl -X GET "http://localhost:8080/JSON/ascan/action/scan/?apikey=$ZAP_API_KEY&url=$TARGET" \
+            curl -X GET "http://localhost:8080/JSON/ascan/action/scan/?apikey=binh204&url=$TARGET" \
                 -H "X-ZAP-API-Key:$ZAP_API_KEY"
 
             echo "📄 Generate Report"
-            curl -X GET "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=$ZAP_API_KEY" \
-                -H "X-ZAP-API-Key:$ZAP_API_KEY" \
+            curl -X GET "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=binh204" \
+                -H "X-ZAP-API-Key:binh204" \
                 --output $WORKSPACE/zap-reports/zap.html
 
             docker stop zap-daemon && docker rm zap-daemon
