@@ -159,117 +159,45 @@ pipeline {
             }
 
         // 1️⃣ Stage: ZAP Scan
-        stage('ZAP Crawl & Active Scan - Fixed') {
+        stage('ZAP Crawl & Active Scan') {
     steps {
         script {
             sh '''
-            TARGET="http://localhost:3000"
-            ZAP_API_KEY="binh204"
-            ZAP_HOST="localhost"
-            ZAP_PORT="8080"
-            REPORT_DIR="$WORKSPACE/zap-reports"
-            
-            echo "🛡 Starting OWASP ZAP Daemon"
-            
-            # Clean up và tạo thư mục
-            mkdir -p $REPORT_DIR
+            echo "🛡 Start OWASP ZAP Daemon MODE (host network)"
+
+            mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
-            
-            # Khởi động ZAP với đúng cấu hình
+
             docker run -d --name zap-daemon \
                 --network host \
-                -v $REPORT_DIR:/zap/wrk \
-                zaproxy/zap-stable zap.sh -daemon \
-                -port $ZAP_PORT -host 0.0.0.0 \
-                -config api.disablekey=false \
-                -config api.key=$ZAP_API_KEY \
+                -v $WORKSPACE/zap-reports:/zap/wrk \
+                zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0 \
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true \
-                -config connection.timeoutInSecs=120
-            
-            echo "⏳ Waiting for ZAP to fully start..."
-            sleep 45
-            
-            # Test connection với API key đúng format
-            echo "🔍 Testing ZAP API with proper authentication..."
-            
-            # Cách 1: Sử dụng X-ZAP-API-Key header
-            API_TEST=$(curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-                "http://$ZAP_HOST:$ZAP_PORT/JSON/core/view/version/")
-            echo "API Test Response: $API_TEST"
-            
-            # Cách 2: Thêm target vào ZAP context trước
-            echo "🌐 Adding target to ZAP..."
-            curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-                "http://$ZAP_HOST:$ZAP_PORT/JSON/core/action/accessUrl/?url=$TARGET"
-            
-            sleep 10
-            
-            # 1. SPIDER SCAN - Sử dụng GET request để tránh CSRF
-            echo "🕷 Starting Spider Scan (GET method)..."
-            SPIDER_ID=$(curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-                "http://$ZAP_HOST:$ZAP_PORT/JSON/spider/action/scan/?url=$TARGET&maxChildren=5&recurse=true&contextName=" | \
-                grep -o '"scan":"[0-9]*"' | cut -d'"' -f4)
-            
-            echo "Spider Scan ID: $SPIDER_ID"
-            echo "⏳ Waiting for spider to complete (120 seconds)..."
-            
-            # Theo dõi tiến trình spider
-            for i in {1..12}; do
-                sleep 10
-                STATUS=$(curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-                    "http://$ZAP_HOST:$ZAP_PORT/JSON/spider/view/status/?scanId=$SPIDER_ID" 2>/dev/null || echo "0")
-                echo "Spider progress: $STATUS%"
+                -config api.disablekey=true
+
+            echo "⏳ Wait ZAP REST API ready..."
+            for i in $(seq 1 60); do
+                if curl -s http://localhost:8080/JSON/core/view/version/ > /dev/null; then
+                    echo "🔥 ZAP API Ready!"
+                    break
+                fi
+                sleep 2
             done
-            
-            # 2. ACTIVE SCAN - Sử dụng GET request
-            echo "⚡ Starting Active Scan (GET method)..."
-            ASCAN_ID=$(curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-                "http://$ZAP_HOST:$ZAP_PORT/JSON/ascan/action/scan/?url=$TARGET&recurse=true&inScopeOnly=true&scanPolicyName=Default Policy" | \
-                grep -o '"scan":"[0-9]*"' | cut -d'"' -f4)
-            
-            echo "Active Scan ID: $ASCAN_ID"
-            echo "⏳ Waiting for active scan (300 seconds)..."
-            
-            # Theo dõi tiến trình active scan
-            for i in {1..30}; do
-                sleep 10
-                STATUS=$(curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-                    "http://$ZAP_HOST:$ZAP_PORT/JSON/ascan/view/status/?scanId=$ASCAN_ID" 2>/dev/null || echo "0")
-                echo "Active scan progress: $STATUS%"
-            done
-            
-            # 3. TẠO REPORTS
-            echo "📄 Generating reports..."
-            
-            # Kiểm tra alerts trước
-            echo "🔍 Checking for alerts..."
-            curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-                "http://$ZAP_HOST:$ZAP_PORT/JSON/core/view/alerts/?baseurl=$TARGET" > $REPORT_DIR/alerts.json
-            
-            # HTML Report - ĐÚNG CÚ PHÁP
-            echo "Generating HTML report..."
-            curl -s "http://$ZAP_HOST:$ZAP_PORT/OTHER/core/other/htmlreport/" \
-                -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-                -o $REPORT_DIR/zap-report.html
-            
-            # XML Report cho DefectDojo - ĐÚNG CÚ PHÁP
-            echo "Generating XML report..."
-            curl -s "http://$ZAP_HOST:$ZAP_PORT/OTHER/core/other/xmlreport/" \
-                -H "X-ZAP-API-Key: $ZAP_API_KEY" \
-                -o $REPORT_DIR/zap-report.xml
-            
-            # Cleanup
-            docker stop zap-daemon || true
-            docker rm zap-daemon || true
-            
-            echo "✅ Scan completed!"
-            echo "📁 Reports in $REPORT_DIR:"
-            ls -la $REPORT_DIR/
-            
-            # Check report sizes
-            echo "📊 Report sizes:"
-            du -h $REPORT_DIR/*.html $REPORT_DIR/*.xml 2>/dev/null || true
+
+            echo "🕷 Spidering..."
+            curl "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
+
+            echo "⚡ Active Scan..."
+            curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
+
+            echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=" \
+                --output $WORKSPACE/zap-reports/zap-report.xml
+
+            docker stop zap-daemon && docker rm zap-daemon
+            echo "📁 Report saved to workspace/zap-reports"
+            ls -lh $WORKSPACE/zap-reports
             '''
         }
     }
