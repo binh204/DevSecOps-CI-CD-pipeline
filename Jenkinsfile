@@ -1,6 +1,5 @@
 pipeline {
     agent any
-
     environment {
         SONARQUBE_SERVER = 'SonarQube'
         SONAR_HOST = 'http://192.168.73.36:9000'
