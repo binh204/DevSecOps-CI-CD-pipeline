@@ -32,7 +32,7 @@ pipeline {
                         sh """
                             ${scannerHome}/bin/sonar-scanner \
                                 -Dsonar.projectKey=${PROJECT_KEY} \
-                                -Dsonar.sources=. \
+                                -Dsonar.sources=./juice-shop\
                                 -Dsonar.login=${SONARQUBE_TOKEN}
                         """
                     }
