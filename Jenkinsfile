@@ -170,7 +170,7 @@ pipeline {
 
             # Chạy ZAP daemon với host network, port 8090
             docker run -d --name zap-daemon \
-                --network host \
+                -p 8090:8090 \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
                 zap.sh -daemon -port 8090 -host 0.0.0.0 \
