@@ -168,7 +168,7 @@ pipeline {
             mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
 
-            ZAP_API_KEY = 'binh204'
+            ZAP_API_KEY='binh204'
 
             docker run -d --name zap-daemon \
                 --network host \
