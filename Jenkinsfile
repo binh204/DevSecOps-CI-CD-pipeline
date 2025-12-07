@@ -193,7 +193,7 @@ pipeline {
 
             echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
             curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=" \
-                --output $WORKSPACE/zap-reports/zap-report.html
+                --output $WORKSPACE/zap-reports/zap-report.xml
 
             docker stop zap-daemon && docker rm zap-daemon
             echo "📁 Report saved to workspace/zap-reports"
