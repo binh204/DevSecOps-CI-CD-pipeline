@@ -163,7 +163,7 @@ pipeline {
     steps {
         script {
             sh '''
-            echo "🛡 Start OWASP ZAP Daemon MODE (host network)"
+            echo "🛡 Start OWASP ZAP Daemon (host network)"
 
             mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
@@ -172,37 +172,51 @@ pipeline {
                 --network host \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0 \
-                -config api.key= \
                 -config api.disablekey=true \
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true
 
-            echo "⏳ Wait ZAP REST API ready..."
+            echo "⏳ Wait ZAP API ready..."
             for i in $(seq 1 60); do
                 if curl -s http://localhost:8080/JSON/core/view/version/ > /dev/null; then
-                    echo "🔥 ZAP API Ready!"
+                    echo "🔥 ZAP is ready!"
                     break
                 fi
                 sleep 2
             done
 
-            echo "🕷 Spidering..."
-            curl "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
+            echo "🕷 Spidering target..."
+            SCAN_ID=$(curl -s "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true" | jq -r .scan)
+
+            echo "⏳ Waiting Spider to complete..."
+            while [ "$(curl -s http://localhost:8080/JSON/spider/view/status/?scanId=$SCAN_ID | jq -r .status)" != "100" ]; do
+                echo "Spider is running..."
+                sleep 5
+            done
 
             echo "⚡ Active Scan..."
-            curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
+            AID=$(curl -s "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000" | jq -r .scan)
 
-            echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
-            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=" \
-                --output $WORKSPACE/zap-reports/zap-report.xml
+            echo "⏳ Waiting Active Scan to finish..."
+            while [ "$(curl -s http://localhost:8080/JSON/ascan/view/status/?scanId=$AID | jq -r .status)" != "100" ]; do
+                echo "Active scanning..."
+                sleep 5
+            done
 
+            echo "📄 Generating ZAP HTML report..."
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/" \
+                -o $WORKSPACE/zap-reports/zap-report.html
+
+            echo "Cleaning..."
             docker stop zap-daemon && docker rm zap-daemon
-            echo "📁 Report saved to workspace/zap-reports"
+
+            echo "📁 Report generated at: zap-reports/zap-report.html"
             ls -lh $WORKSPACE/zap-reports
             '''
         }
     }
 }
+
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
