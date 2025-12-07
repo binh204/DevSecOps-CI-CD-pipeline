@@ -159,41 +159,117 @@ pipeline {
             }
 
         // 1️⃣ Stage: ZAP Scan
-        stage('ZAP Scan using ZAP CLI') {
+        stage('ZAP Crawl & Active Scan - Fixed') {
     steps {
         script {
             sh '''
             TARGET="http://localhost:3000"
             ZAP_API_KEY="binh204"
+            ZAP_HOST="localhost"
+            ZAP_PORT="8080"
             REPORT_DIR="$WORKSPACE/zap-reports"
             
-            echo "🛡 Starting ZAP with CLI approach"
+            echo "🛡 Starting OWASP ZAP Daemon"
             
+            # Clean up và tạo thư mục
             mkdir -p $REPORT_DIR
+            docker rm -f zap-daemon || true
             
-            # Dọn dẹp container cũ
-            docker rm -f zap-scan || true
+            # Khởi động ZAP với đúng cấu hình
+            docker run -d --name zap-daemon \
+                --network host \
+                -v $REPORT_DIR:/zap/wrk \
+                zaproxy/zap-stable zap.sh -daemon \
+                -port $ZAP_PORT -host 0.0.0.0 \
+                -config api.disablekey=false \
+                -config api.key=$ZAP_API_KEY \
+                -config api.addrs.addr.name=.* \
+                -config api.addrs.addr.regex=true \
+                -config connection.timeoutInSecs=120
             
-            # Chạy ZAP scan sử dụng ZAP Baseline
-            docker run -v $(pwd):/zap/wrk/:rw \
-                -u zap \
-                -t zaproxy/zap-stable zap-baseline.py \
-                -t $TARGET \
-                -g gen.conf \
-                -r zap-report.html \
-                -x zap-report.xml \
-                -J zap-report.json \
-                -a \
-                -I \
-                -j \
-                --hook=/zap/auth_hook.py \
-                -z "-config api.disablekey=true"  # Tắt API key requirement
+            echo "⏳ Waiting for ZAP to fully start..."
+            sleep 45
             
-            # Di chuyển reports
-            mv zap-report.html zap-report.xml zap-report.json $REPORT_DIR/ 2>/dev/null || true
+            # Test connection với API key đúng format
+            echo "🔍 Testing ZAP API with proper authentication..."
             
-            echo "✅ ZAP CLI scan completed!"
+            # Cách 1: Sử dụng X-ZAP-API-Key header
+            API_TEST=$(curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
+                "http://$ZAP_HOST:$ZAP_PORT/JSON/core/view/version/")
+            echo "API Test Response: $API_TEST"
+            
+            # Cách 2: Thêm target vào ZAP context trước
+            echo "🌐 Adding target to ZAP..."
+            curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
+                "http://$ZAP_HOST:$ZAP_PORT/JSON/core/action/accessUrl/?url=$TARGET"
+            
+            sleep 10
+            
+            # 1. SPIDER SCAN - Sử dụng GET request để tránh CSRF
+            echo "🕷 Starting Spider Scan (GET method)..."
+            SPIDER_ID=$(curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
+                "http://$ZAP_HOST:$ZAP_PORT/JSON/spider/action/scan/?url=$TARGET&maxChildren=5&recurse=true&contextName=" | \
+                grep -o '"scan":"[0-9]*"' | cut -d'"' -f4)
+            
+            echo "Spider Scan ID: $SPIDER_ID"
+            echo "⏳ Waiting for spider to complete (120 seconds)..."
+            
+            # Theo dõi tiến trình spider
+            for i in {1..12}; do
+                sleep 10
+                STATUS=$(curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
+                    "http://$ZAP_HOST:$ZAP_PORT/JSON/spider/view/status/?scanId=$SPIDER_ID" 2>/dev/null || echo "0")
+                echo "Spider progress: $STATUS%"
+            done
+            
+            # 2. ACTIVE SCAN - Sử dụng GET request
+            echo "⚡ Starting Active Scan (GET method)..."
+            ASCAN_ID=$(curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
+                "http://$ZAP_HOST:$ZAP_PORT/JSON/ascan/action/scan/?url=$TARGET&recurse=true&inScopeOnly=true&scanPolicyName=Default Policy" | \
+                grep -o '"scan":"[0-9]*"' | cut -d'"' -f4)
+            
+            echo "Active Scan ID: $ASCAN_ID"
+            echo "⏳ Waiting for active scan (300 seconds)..."
+            
+            # Theo dõi tiến trình active scan
+            for i in {1..30}; do
+                sleep 10
+                STATUS=$(curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
+                    "http://$ZAP_HOST:$ZAP_PORT/JSON/ascan/view/status/?scanId=$ASCAN_ID" 2>/dev/null || echo "0")
+                echo "Active scan progress: $STATUS%"
+            done
+            
+            # 3. TẠO REPORTS
+            echo "📄 Generating reports..."
+            
+            # Kiểm tra alerts trước
+            echo "🔍 Checking for alerts..."
+            curl -s -H "X-ZAP-API-Key: $ZAP_API_KEY" \
+                "http://$ZAP_HOST:$ZAP_PORT/JSON/core/view/alerts/?baseurl=$TARGET" > $REPORT_DIR/alerts.json
+            
+            # HTML Report - ĐÚNG CÚ PHÁP
+            echo "Generating HTML report..."
+            curl -s "http://$ZAP_HOST:$ZAP_PORT/OTHER/core/other/htmlreport/" \
+                -H "X-ZAP-API-Key: $ZAP_API_KEY" \
+                -o $REPORT_DIR/zap-report.html
+            
+            # XML Report cho DefectDojo - ĐÚNG CÚ PHÁP
+            echo "Generating XML report..."
+            curl -s "http://$ZAP_HOST:$ZAP_PORT/OTHER/core/other/xmlreport/" \
+                -H "X-ZAP-API-Key: $ZAP_API_KEY" \
+                -o $REPORT_DIR/zap-report.xml
+            
+            # Cleanup
+            docker stop zap-daemon || true
+            docker rm zap-daemon || true
+            
+            echo "✅ Scan completed!"
+            echo "📁 Reports in $REPORT_DIR:"
             ls -la $REPORT_DIR/
+            
+            # Check report sizes
+            echo "📊 Report sizes:"
+            du -h $REPORT_DIR/*.html $REPORT_DIR/*.xml 2>/dev/null || true
             '''
         }
     }
