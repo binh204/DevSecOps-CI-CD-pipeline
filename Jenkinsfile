@@ -170,10 +170,10 @@ pipeline {
 
             # Chạy ZAP daemon với host network, port 8090
             docker run -d --name zap-daemon \
-                -p 8090:8090 \
+                -p 8080:8080 \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
-                zap.sh -daemon -port 8090 -host 0.0.0.0 \
+                zap.sh -daemon -port 8080 -host 0.0.0.0 \
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true \
                 -config api.disablekey=true
@@ -188,13 +188,13 @@ pipeline {
             done
 
             echo "🕷 Spidering..."
-            curl "http://localhost:8090/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
+            curl "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
 
             echo "⚡ Active Scan..."
-            curl "http://localhost:8090/JSON/ascan/action/scan/?url=http://localhost:3000"
+            curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
 
             echo "📄 Generating HTML report via API"
-            curl "http://localhost:8090/OTHER/core/other/htmlreport/?apikey=" \
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=" \
                 --output $WORKSPACE/zap-reports/zap-report.xml
 
             docker stop zap-daemon && docker rm zap-daemon
