@@ -159,39 +159,32 @@ pipeline {
             }
       */
         // 1️⃣ Stage: ZAP Scan
-       stage('ZAP Crawl & Active Scan') {
+       stage('ZAP Crawl & Scan') {
     steps {
         script {
             sh """
-            echo "===== START ZAP ====="
-
             docker rm -f zap-daemon || true
             docker run -d --name zap-daemon \
-                --network host \
+                -p 8082:8080 \
                 zaproxy/zap-stable zap.sh -daemon \
-                -port 8080 -config api.key=binh204 \
-                -config api.disablekey=false \
+                -config api.key=binh204 \
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true
 
-            echo "⏳ Wait ZAP ready..."
+            echo "⏳ Wait ZAP..."
             for i in \$(seq 1 40); do
-                RES=\$(curl -s http://172.17.0.1:8080/JSON/core/view/version/?apikey=binh204)
+                RES=\$(curl -s http://host.docker.internal:8082/JSON/core/view/version/?apikey=binh204)
                 if echo \$RES | grep -q "version"; then
-                    echo "🔥 ZAP READY: \$RES"
+                    echo "🔥 ZAP READY"
                     break
                 fi
                 sleep 2
             done
 
-            echo "🕷 Spider..."
-            curl "http://172.17.0.1:8080/JSON/spider/action/scan/?apikey=binh204&url=http://172.17.0.1:3000"
+            curl "http://host.docker.internal:8082/JSON/spider/action/scan/?apikey=binh204&url=http://172.17.0.1:3000"
+            curl "http://host.docker.internal:8082/JSON/ascan/action/scan/?apikey=binh204&url=http://172.17.0.1:3000"
 
-            echo "⚡ Active Scan..."
-            curl "http://172.17.0.1:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://172.17.0.1:3000"
-
-            echo "📄 Export report"
-            curl "http://172.17.0.1:8080/OTHER/core/other/htmlreport/?apikey=binh204" \
+            curl "http://host.docker.internal:8082/OTHER/core/other/htmlreport/?apikey=binh204" \
                 --output $WORKSPACE/zap-reports/zap-report.html
 
             docker stop zap-daemon && docker rm zap-daemon
@@ -199,6 +192,7 @@ pipeline {
         }
     }
 }
+
 
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
