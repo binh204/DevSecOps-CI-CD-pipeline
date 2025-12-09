@@ -174,10 +174,11 @@ pipeline {
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true
 
-            echo "⏳ Wait ZAP REST API ready..."
-            for i in \$(seq 1 60); do
-                if curl -s http://172.17.0.1:8080/JSON/core/view/version/ > /dev/null; then
-                    echo "🔥 ZAP API Ready!"
+            echo "⏳ Wait ZAP ready..."
+            for i in \$(seq 1 40); do
+                RES=\$(curl -s http://172.17.0.1:8080/JSON/core/view/version/?apikey=binh204)
+                if echo \$RES | grep -q "version"; then
+                    echo "🔥 ZAP READY: \$RES"
                     break
                 fi
                 sleep 2
@@ -198,6 +199,7 @@ pipeline {
         }
     }
 }
+
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
