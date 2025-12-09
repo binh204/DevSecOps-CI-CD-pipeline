@@ -169,7 +169,7 @@ pipeline {
             docker rm -f zap-daemon || true
 
             docker run -d --name zap-daemon \
-                -p 8082:8080 \                # 🔥 ZAP = 8082 EXTERNAL PORT
+                -p 8082:8080 \
                 -v \$WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable zap.sh -daemon \
                 -config api.key=binh204 \
