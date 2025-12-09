@@ -188,7 +188,7 @@ pipeline {
             done
 
             echo "🕷 Spidering Target..."
-            curl "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204&url=http://localhost:3000&recurse=true"
+            curl "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204&url=http%3A%2F%2Flocalhost%3A3000&recurse=true"
 
             echo "⚡ Active Scan..."
             curl "http://localhost:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000"
