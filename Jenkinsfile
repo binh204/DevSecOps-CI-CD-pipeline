@@ -162,54 +162,48 @@ pipeline {
         stage('ZAP Crawl & Active Scan') {
     steps {
         script {
-
             sh '''
-            echo "🛡 Tạo file cấu hình API cho ZAP"
+            echo "🛡 Start OWASP ZAP Daemon (Headless API Mode)"
+
             mkdir -p $WORKSPACE/zap-reports
-
-            cat > $WORKSPACE/zap.conf <<EOF
-api.disablekey=false
-api.key=binh204
-api.addrs.addr.name=.*
-api.addrs.addr.regex=true
-EOF
-
-            echo "🚀 Start ZAP Daemon with API Key"
-
             docker rm -f zap-daemon || true
+
             docker run -d --name zap-daemon \
                 --network host \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
-                -v $WORKSPACE/zap.conf:/home/zap/.ZAP_D/config.xml \
-                zaproxy/zap-stable zap.sh \
-                -daemon \
-                -port 8080 \
-                -host 0.0.0.0
+                -e ZAP_API_KEY=binh204 \
+                -e ZAP_API_DISABLEKEY=false \
+                -e ZAP_WHITELIST=.* \
+                owasp/zap2docker-stable zap.sh -daemon \
+                -port 8080 -host 0.0.0.0
 
-            echo "⏳ Wait ZAP API ready..."
-            for i in $(seq 1 30); do
+            echo "⏳ Waiting ZAP API ready..."
+            for i in $(seq 1 60); do
                 if curl -s "http://localhost:8080/JSON/core/view/version/?apikey=binh204" > /dev/null; then
-                    echo "🔥 ZAP API Ready!"
+                    echo "🔥 ZAP API READY!"
                     break
                 fi
                 sleep 2
             done
 
-            echo "🕷 Spidering..."
+            echo "🕷 Spidering Target..."
             curl "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204&url=http://localhost:3000&recurse=true"
 
             echo "⚡ Active Scan..."
             curl "http://localhost:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000"
 
-            echo "📄 Generating report..."
-            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=binh204" --output $WORKSPACE/zap-reports/zap-report.html
+            echo "📄 Exporting HTML Report..."
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=binh204" \
+                --output $WORKSPACE/zap-reports/zap-report.html
 
             docker stop zap-daemon && docker rm zap-daemon
+            echo "📁 Report saved in: workspace/zap-reports"
             ls -lh $WORKSPACE/zap-reports
             '''
         }
     }
 }
+
 
 
 
