@@ -159,67 +159,51 @@ pipeline {
             }
       */
         // 1️⃣ Stage: ZAP Scan
-       stage('ZAP Crawl & Active Scan (Debug)') {
+       stage('ZAP Crawl & Active Scan') {
     steps {
         script {
             sh """
-            echo "=============== 🛡 START OWASP ZAP ==============="
+            echo "=== START ZAP FIXED PORT ==="
 
-            mkdir -p \$WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
+            mkdir -p \$WORKSPACE/zap-reports
 
             docker run -d --name zap-daemon \
                 --network host \
                 -v \$WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable zap.sh -daemon \
-                -host 0.0.0.0 -port 8080 \
+                -host 0.0.0.0 -port 8090 \
                 -config api.key=binh204 \
                 -config api.disablekey=false \
                 -config api.addrs.addr.name=.* \
-                -config api.addrs.addr.regex=true \
-                -config api.security=false \
-                -config api.allowUnsafe=true
+                -config api.addrs.addr.regex=true
 
-            echo "⏳ Waiting for ZAP to be ready..."
+            echo "⏳ Waiting ZAP ready..."
             for i in \$(seq 1 40); do
-                RES=\$(curl -s http://localhost:8080/JSON/core/view/version/?apikey=binh204)
-                if [ ! -z "\$RES" ]; then
-                    echo "🔥 ZAP API READY → Version: \$RES"
+                if curl -s "http://localhost:8090/JSON/core/view/version/?apikey=binh204" | grep version; then
+                    echo "🔥 ZAP READY"
                     break
                 fi
-                echo "⌛ ZAP not ready yet... retrying (\$i)"
-                sleep 3
+                sleep 2
             done
 
-            echo "=============== 🔍 DEBUG CONNECTION TEST ==============="
-            echo "🔹 Test access to ZAP:"
-            curl -v http://localhost:8080/JSON/core/view/version/?apikey=binh204 || echo "❌ ZAP unreachable"
+            echo "🕷 Spider"
+            curl "http://localhost:8090/JSON/spider/action/scan/?apikey=binh204&url=http://localhost:3000&recurse=true"
 
-            echo "🔹 Test access to Target App:"
-            curl -v http://localhost:3000 || echo "❌ Target App unreachable from Jenkins"
-            echo "========================================================"
+            echo "⚡ Active Scan"
+            curl "http://localhost:8090/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000"
 
-            echo "🕷 Start Spider (with debug output):"
-            SCAN_ID=\$(curl -s "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204&url=http://localhost:3000&recurse=true")
-            echo "🔎 Spider Response: \$SCAN_ID"
-
-            echo "⚡ Start Active Scan:"
-            AID=\$(curl -s "http://localhost:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000")
-            echo "🔎 Active Scan Response: \$AID"
-
-            echo "📄 Export HTML Report..."
-            curl -s "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=binh204" \
+            echo "📄 Export Report"
+            curl "http://localhost:8090/OTHER/core/other/htmlreport/?apikey=binh204" \
                 --output \$WORKSPACE/zap-reports/zap-report.html
 
-            echo "🧹 Cleanup container"
             docker stop zap-daemon && docker rm zap-daemon
-
-            echo "📁 Report saved:"
-            ls -l \$WORKSPACE/zap-reports
+            ls -lh \$WORKSPACE/zap-reports
             """
         }
     }
 }
+
 
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
