@@ -172,7 +172,7 @@ pipeline {
                 --network host \
                 -v \$WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable zap.sh -daemon \
-                -host 0.0.0.0 -port 8085 \
+                -host 0.0.0.0 -port 8080 \
                 -config api.key=binh204 \
                 -config api.disablekey=false \
                 -config api.addrs.addr.name=.* \
@@ -180,7 +180,7 @@ pipeline {
 
             echo "⏳ Waiting ZAP ready..."
             for i in \$(seq 1 40); do
-                if curl -s "http://localhost:8085/JSON/core/view/version/?apikey=binh204" | grep version; then
+                if curl -s "http://localhost:8080/JSON/core/view/version/?apikey=binh204" | grep version; then
                     echo "🔥 ZAP READY"
                     break
                 fi
@@ -188,13 +188,13 @@ pipeline {
             done
 
             echo "🕷 Spider"
-            curl "http://localhost:8085/JSON/spider/action/scan/?apikey=binh204&url=http://localhost:3000&recurse=true"
+            curl "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204&url=http://localhost:3000&recurse=true"
 
             echo "⚡ Active Scan"
-            curl "http://localhost:8085/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000"
+            curl "http://localhost:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000"
 
             echo "📄 Export Report"
-            curl "http://localhost:8085/OTHER/core/other/htmlreport/?apikey=binh204" \
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=binh204" \
                 --output \$WORKSPACE/zap-reports/zap-report.xml
 
             docker stop zap-daemon && docker rm zap-daemon
