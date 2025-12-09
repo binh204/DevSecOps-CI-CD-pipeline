@@ -121,7 +121,7 @@ pipeline {
                 }
             }
         }
-      
+      */
         // 8️⃣ Build Docker Image
         stage('Build Docker Image') {
             steps {
@@ -152,12 +152,12 @@ pipeline {
                         docker rm juice-app || true
                     '''
             
-                    sh "docker run -d --name juice-app -p 3000:3000 juice-shop:${BUILD_NUMBER}"
+                    sh "docker run -d --name juice-app --network devsecops -p 3000:3000 juice-shop:${BUILD_NUMBER}"
                     sleep 25
                     }
                 }
             }
-      */
+      
         // 1️⃣ Stage: ZAP Scan
        stage('ZAP Crawl & Active Scan (Debug)') {
     steps {
@@ -168,9 +168,7 @@ pipeline {
             mkdir -p \$WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
 
-            docker run -d --name zap-daemon \
-  --network zap-net \
-  -p 10000:8080 \
+            docker run -d --name zap-daemon --network devsecops \
   -v $WORKSPACE/zap-reports:/zap/wrk \
   zaproxy/zap-stable zap.sh -daemon \
   -host 0.0.0.0 -port 8080 \
@@ -179,9 +177,10 @@ pipeline {
   -config api.addrs.addr.name=.* \
   -config api.addrs.addr.regex=true
 
+
             echo "⏳ Waiting for ZAP to be ready..."
             for i in \$(seq 1 40); do
-                RES=\$(curl -s http://localhost:8080/JSON/core/view/version/?apikey=binh204)
+                RES=\$(curl -s http://zap-daemon:8080/JSON/core/view/version/?apikey=binh204)
                 if [ ! -z "\$RES" ]; then
                     echo "🔥 ZAP API READY → Version: \$RES"
                     break
@@ -192,23 +191,23 @@ pipeline {
 
             echo "=============== 🔍 DEBUG CONNECTION TEST ==============="
             echo "🔹 Test access to ZAP:"
-            curl -v http://localhost:8080/JSON/core/view/version/?apikey=binh204 || echo "❌ ZAP unreachable"
+            curl -v http://zap-daemon:8080/JSON/core/view/version/?apikey=binh204 || echo "❌ ZAP unreachable"
 
             echo "🔹 Test access to Target App:"
-            curl -v http://localhost:3000 || echo "❌ Target App unreachable from Jenkins"
+            curl -v http://zap-daemon:3000 || echo "❌ Target App unreachable from Jenkins"
             echo "========================================================"
 
             echo "🕷 Start Spider (with debug output):"
-            SCAN_ID=\$(curl -s "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204&url=http://localhost:3000&recurse=true")
+            SCAN_ID=\$(curl -s "http://zap-daemon:8080/JSON/spider/action/scan/?apikey=binh204&url=http://juice-app:3000&recurse=true")
             echo "🔎 Spider Response: \$SCAN_ID"
 
             echo "⚡ Start Active Scan:"
-            AID=\$(curl -s "http://localhost:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000")
+            AID=\$(curl -s "http://zap-daemon:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://juice-app:3000")
             echo "🔎 Active Scan Response: \$AID"
 
             echo "📄 Export HTML Report..."
-            curl -s "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=binh204" \
-                --output \$WORKSPACE/zap-reports/zap-report.html
+            curl -s "http://zap-daemon:8080/OTHER/core/other/xmlreport/?apikey=binh204" \
+                --output \$WORKSPACE/zap-reports/zap-report.xml
 
             echo "🧹 Cleanup container"
             docker stop zap-daemon && docker rm zap-daemon
