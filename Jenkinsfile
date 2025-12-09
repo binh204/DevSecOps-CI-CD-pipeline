@@ -8,7 +8,7 @@ pipeline {
         SONARQUBE_TOKEN = credentials('sonar-token')
         DEFECTDOJO_API_KEY = credentials('defectdojo-api')
 
-        DEFECTDOJO_URL = 'http://192.168.73.36:8080'
+        DEFECTDOJO_URL = 'http://192.168.73.36:8090'
         DEFECTDOJO_ENGAGEMENT_ID = '2'
     }
     
