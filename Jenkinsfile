@@ -173,14 +173,13 @@ pipeline {
     -v $WORKSPACE/zap-reports:/zap/wrk \
     zaproxy/zap-stable zap.sh -daemon \
     -host 0.0.0.0 -port 8080 \
-    -config ui.disable=true \                # 🔥 TẮT hoàn toàn giao diện login UI
+    -config ui.disable=true \
     -config api.key=binh204 \
     -config api.disablekey=false \
     -config api.addrs.addr.name=.* \
     -config api.addrs.addr.regex=true \
-    -config api.security=false \             # 🔥 Bắt buộc để bỏ chặn auth enforcement
-    -config api.allowUnsafe=true             # 🔥 Cho phép API không cần session UI
-
+    -config api.security=false \
+    -config api.allowUnsafe=true
 
             echo "⏳ Waiting ZAP API ready..."
             for i in $(seq 1 60); do
