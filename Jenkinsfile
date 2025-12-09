@@ -174,7 +174,7 @@ pipeline {
                 -e ZAP_API_KEY=binh204 \
                 -e ZAP_API_DISABLEKEY=false \
                 -e ZAP_WHITELIST=.* \
-                owasp/zap2docker-stable zap.sh -daemon \
+                zaproxy/zap-stable zap.sh -daemon \
                 -port 8080 -host 0.0.0.0
 
             echo "⏳ Waiting ZAP API ready..."
