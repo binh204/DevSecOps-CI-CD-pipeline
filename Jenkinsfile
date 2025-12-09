@@ -174,7 +174,8 @@ pipeline {
                 zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0 \
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true \
-                -config api.disablekey=true
+                -config api.disablekey=true \
+                -config api.ui.enabled=false
 
 
             echo "⏳ Wait ZAP REST API ready..."
