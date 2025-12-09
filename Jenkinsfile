@@ -169,15 +169,16 @@ pipeline {
             docker rm -f zap-daemon || true
 
             docker run -d --name zap-daemon \
-    --network host \
-    -v $WORKSPACE/zap-reports:/zap/wrk \
-    zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0 \
-    -config api.key= \
-    -config api.disablekey=true \
-    -config api.addrs.addr.name=.* \
-    -config api.addrs.addr.regex=true \
-    -config api.allowUnsafe=true
-
+  --network host \
+  -v $WORKSPACE/zap-reports:/zap/wrk \
+  zaproxy/zap-stable zap.sh -daemon \
+  -port 8080 -host 0.0.0.0 \
+  -config api.key= \
+  -config api.disablekey=true \
+  -config api.addrs.addr.name=.* \
+  -config api.addrs.addr.regex=true \
+  -config api.incerrordetails=true \
+  -config api.enablecors=true
 
             echo "⏳ Wait ZAP REST API ready..."
             for i in $(seq 1 60); do
