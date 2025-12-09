@@ -165,12 +165,12 @@ pipeline {
             sh """
             echo "🛡 Start OWASP ZAP Daemon (Headless API Mode)"
 
-            mkdir -p $WORKSPACE/zap-reports
+            mkdir -p \$WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
 
             docker run -d --name zap-daemon \
                 --network host \
-                -v $WORKSPACE/zap-reports:/zap/wrk \
+                -v \$WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable zap.sh -daemon \
                 -host 0.0.0.0 -port 8080 \
                 -config ui.disable=true \
@@ -182,31 +182,32 @@ pipeline {
                 -config api.allowUnsafe=true
 
             echo "⏳ Waiting ZAP API ready..."
-            for i in $(seq 1 60); do
+            for i in \$(seq 1 60); do
                 if curl -s "http://localhost:8080/JSON/core/view/version/?apikey=binh204" > /dev/null; then
                     echo "🔥 ZAP API READY!"
                     break
                 fi
                 sleep 2
             done
-            
+
             echo "🕷 Starting Spider Scan..."
-            curl "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204\\&url=http%3A%2F%2Flocalhost%3A3000\\&recurse=true"
+            curl "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204\\&url=http://localhost:3000\\&recurse=true"
 
             echo "⚡ Active Scan..."
             curl "http://localhost:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000"
 
-            echo "📄 Export XML Report..."
+            echo "📄 Export HTML Report..."
             curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=binh204" \
-                 --output $WORKSPACE/zap-reports/zap-report.xml
+                --output \$WORKSPACE/zap-reports/zap-report.html
 
             docker stop zap-daemon && docker rm zap-daemon
-            echo "📁 Done. Reports exist in workspace/zap-reports/"
-            ls -lh $WORKSPACE/zap-reports
+            echo "📁 Reports generated:"
+            ls -lh \$WORKSPACE/zap-reports
             """
         }
     }
 }
+
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
