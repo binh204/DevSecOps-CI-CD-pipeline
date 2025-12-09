@@ -169,10 +169,9 @@ pipeline {
             docker rm -f zap-daemon || true
 
             docker run -d --name zap-daemon \
-                --network host \
+                -p 8082:8080 \                # 🔥 ZAP = 8082 EXTERNAL PORT
                 -v \$WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable zap.sh -daemon \
-                -host 0.0.0.0 -port 8080 \
                 -config api.key=binh204 \
                 -config api.disablekey=false \
                 -config api.addrs.addr.name=.* \
@@ -180,46 +179,47 @@ pipeline {
                 -config api.security=false \
                 -config api.allowUnsafe=true
 
-            echo "⏳ Waiting for ZAP to be ready..."
+            echo "⏳ Waiting ZAP ready..."
             for i in \$(seq 1 40); do
-                RES=\$(curl -s http://localhost:8080/JSON/core/view/version/?apikey=binh204)
-                if [ ! -z "\$RES" ]; then
-                    echo "🔥 ZAP API READY → Version: \$RES"
+                RES=\$(curl -s http://localhost:8082/JSON/core/view/version/?apikey=binh204)
+                if [[ "\$RES" =~ "version" ]]; then
+                    echo "🔥 ZAP READY → \$RES"
                     break
                 fi
-                echo "⌛ ZAP not ready yet... retrying (\$i)"
-                sleep 3
+                echo "⌛ (\$i) waiting..."
+                sleep 2
             done
 
-            echo "=============== 🔍 DEBUG CONNECTION TEST ==============="
-            echo "🔹 Test access to ZAP:"
-            curl -v http://localhost:8080/JSON/core/view/version/?apikey=binh204 || echo "❌ ZAP unreachable"
+            echo "=============== 🔍 DEBUG CHECK ==============="
+            echo "🔹 CURL ZAP:"
+            curl -v http://localhost:8082/JSON/core/view/version/?apikey=binh204 || echo "❌ FAIL"
 
-            echo "🔹 Test access to Target App:"
-            curl -v http://localhost:3000 || echo "❌ Target App unreachable from Jenkins"
-            echo "========================================================"
+            echo "🔹 CURL Target Web:"
+            curl -v http://host.docker.internal:3000 || echo "❌ Target unreachable"
+            echo "==============================================="
 
-            echo "🕷 Start Spider (with debug output):"
-            SCAN_ID=\$(curl -s "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204&url=http://localhost:3000&recurse=true")
-            echo "🔎 Spider Response: \$SCAN_ID"
+            echo "🕷 Spider Scan..."
+            SCAN_ID=\$(curl -s "http://localhost:8082/JSON/spider/action/scan/?apikey=binh204&url=http://host.docker.internal:3000&recurse=true")
+            echo "🔎 Spider Response = \$SCAN_ID"
 
-            echo "⚡ Start Active Scan:"
-            AID=\$(curl -s "http://localhost:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000")
-            echo "🔎 Active Scan Response: \$AID"
+            echo "⚡ Active Scan..."
+            AID=\$(curl -s "http://localhost:8082/JSON/ascan/action/scan/?apikey=binh204&url=http://host.docker.internal:3000")
+            echo "🔎 Active Scan Response = \$AID"
 
-            echo "📄 Export HTML Report..."
-            curl -s "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=binh204" \
+            echo "📄 Generate HTML Report..."
+            curl -s "http://localhost:8082/OTHER/core/other/htmlreport/?apikey=binh204" \
                 --output \$WORKSPACE/zap-reports/zap-report.html
 
-            echo "🧹 Cleanup container"
+            echo "🧹 Cleanup"
             docker stop zap-daemon && docker rm zap-daemon
 
-            echo "📁 Report saved:"
-            ls -l \$WORKSPACE/zap-reports
+            echo "📁 Scan Report:"
+            ls -lh \$WORKSPACE/zap-reports
             """
         }
     }
 }
+
 
 
 
