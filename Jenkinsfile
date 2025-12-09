@@ -162,26 +162,32 @@ pipeline {
         stage('ZAP Crawl & Active Scan') {
     steps {
         script {
+
             sh '''
-            echo "🛡 Start OWASP ZAP Daemon MODE (host network)"
-
+            echo "🛡 Tạo file cấu hình API cho ZAP"
             mkdir -p $WORKSPACE/zap-reports
+
+            cat > $WORKSPACE/zap.conf <<EOF
+api.disablekey=false
+api.key=binh204
+api.addrs.addr.name=.*
+api.addrs.addr.regex=true
+EOF
+
+            echo "🚀 Start ZAP Daemon with API Key"
+
             docker rm -f zap-daemon || true
+            docker run -d --name zap-daemon \
+                --network host \
+                -v $WORKSPACE/zap-reports:/zap/wrk \
+                -v $WORKSPACE/zap.conf:/home/zap/.ZAP_D/config.xml \
+                zaproxy/zap-stable zap.sh \
+                -daemon \
+                -port 8080 \
+                -host 0.0.0.0
 
-           docker run -d --name zap-daemon \
-    --network host \
-    -v $WORKSPACE/zap-reports:/zap/wrk \
-    zaproxy/zap-stable zap.sh \
-    -daemon \
-    -port 8080 \
-    -host 0.0.0.0 \
-    -config api.key=binh204 \
-    -config api.disablekey=false \
-    -config api.addrs.addr.name=.* \
-    -config api.addrs.addr.regex=true
-
-            echo "⏳ Wait ZAP REST API ready..."
-            for i in $(seq 1 60); do
+            echo "⏳ Wait ZAP API ready..."
+            for i in $(seq 1 30); do
                 if curl -s "http://localhost:8080/JSON/core/view/version/?apikey=binh204" > /dev/null; then
                     echo "🔥 ZAP API Ready!"
                     break
@@ -195,18 +201,16 @@ pipeline {
             echo "⚡ Active Scan..."
             curl "http://localhost:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000"
 
-            echo "📄 Generating HTML report via API"
-            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=binh204" \
-                --output $WORKSPACE/zap-reports/zap-report.html
+            echo "📄 Generating report..."
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=binh204" --output $WORKSPACE/zap-reports/zap-report.html
 
             docker stop zap-daemon && docker rm zap-daemon
-
-            echo "📁 Report saved to workspace/zap-reports"
             ls -lh $WORKSPACE/zap-reports
             '''
         }
     }
 }
+
 
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
