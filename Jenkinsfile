@@ -172,12 +172,11 @@ pipeline {
     -p 10000:10000 \
     -v $WORKSPACE/zap-reports:/zap/wrk \
     zaproxy/zap-stable zap.sh -daemon \
+    -config proxy.port=10000 \
     -config api.key=binh204 \
     -config api.disablekey=false \
     -config api.addrs.addr.name=.* \
     -config api.addrs.addr.regex=true
-
-
 
             echo "⏳ Wait ZAP REST API ready..."
             for i in $(seq 1 60); do
