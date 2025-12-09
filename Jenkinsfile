@@ -175,7 +175,7 @@ pipeline {
                 -config api.addrs.addr.regex=true
 
             echo "⏳ Wait ZAP REST API ready..."
-            for i in $(seq 1 60); do
+            for i in \$(seq 1 60); do
                 if curl -s http://172.17.0.1:8080/JSON/core/view/version/ > /dev/null; then
                     echo "🔥 ZAP API Ready!"
                     break
