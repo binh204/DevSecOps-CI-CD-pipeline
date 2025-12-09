@@ -162,7 +162,7 @@ pipeline {
         stage('ZAP Crawl & Active Scan') {
     steps {
         script {
-            sh '''
+            sh """
             echo "🛡 Start OWASP ZAP Daemon (Headless API Mode)"
 
             mkdir -p $WORKSPACE/zap-reports
@@ -189,9 +189,9 @@ pipeline {
                 fi
                 sleep 2
             done
-
+            
             echo "🕷 Starting Spider Scan..."
-            curl "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204&url=http://localhost:3000&recurse=true"
+            curl "http://localhost:8080/JSON/spider/action/scan/?apikey=binh204\\&url=http%3A%2F%2Flocalhost%3A3000\\&recurse=true"
 
             echo "⚡ Active Scan..."
             curl "http://localhost:8080/JSON/ascan/action/scan/?apikey=binh204&url=http://localhost:3000"
@@ -203,7 +203,7 @@ pipeline {
             docker stop zap-daemon && docker rm zap-daemon
             echo "📁 Done. Reports exist in workspace/zap-reports/"
             ls -lh $WORKSPACE/zap-reports
-            '''
+            """
         }
     }
 }
