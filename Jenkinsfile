@@ -163,48 +163,63 @@ pipeline {
     steps {
         script {
             sh '''
-            echo "🛡 Start OWASP ZAP Daemon MODE (host network, port 8090)"
+            echo "🛡 Starting OWASP ZAP Daemon on port 8090..."
 
             mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
 
-            # Chạy ZAP daemon với host network, port 8090
+            # Run ZAP Daemon (no API key, bind 0.0.0.0, using port 8090)
             docker run -d --name zap-daemon \
                 -p 8090:8090 \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
                 zaproxy/zap-stable \
-                zap.sh -daemon -port 8090 -host 0.0.0.0 \
+                zap.sh -daemon \
+                -port 8090 \
+                -host 0.0.0.0 \
+                -config api.key= \
+                -config api.disablekey=true \
                 -config api.addrs.addr.name=.* \
-                -config api.addrs.addr.regex=true \
-                -config api.disablekey=true
+                -config api.addrs.addr.regex=true
 
-            echo "⏳ Wait ZAP REST API ready..."
+            echo "⏳ Waiting for ZAP REST API..."
+
+            READY=false
             for i in $(seq 1 60); do
-                if curl -s http://localhost:8090/JSON/core/view/version/ > /dev/null; then
+                STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:8090/JSON/core/view/version/)
+                if [ "$STATUS" = "200" ]; then
                     echo "🔥 ZAP API Ready!"
+                    READY=true
                     break
                 fi
-                sleep 2
+                echo "⌛ ZAP not ready yet ($i/60) — retrying..."
+                sleep 3
             done
 
-            echo "🕷 Spidering..."
+            # Nếu quá timeout → stop build
+            if [ "$READY" = "false" ]; then
+                echo "❌ ZAP failed to start. View logs:"
+                docker logs zap-daemon | head -n 50
+                exit 1
+            fi
+
+            echo "🕷 Spidering Target..."
             curl "http://localhost:8090/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
 
             echo "⚡ Active Scan..."
             curl "http://localhost:8090/JSON/ascan/action/scan/?url=http://localhost:3000"
 
-            echo "📄 Generating HTML report via API"
+            echo "📄 Generating HTML Report..."
             curl "http://localhost:8090/OTHER/core/other/htmlreport/?apikey=" \
-                --output $WORKSPACE/zap-reports/zap-report.xml
+                --output $WORKSPACE/zap-reports/zap-report.html
 
             docker stop zap-daemon && docker rm zap-daemon
-            echo "📁 Report saved to workspace/zap-reports"
+
+            echo "📁 ZAP Report saved → workspace/zap-reports"
             ls -lh $WORKSPACE/zap-reports
             '''
         }
     }
 }
-
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
