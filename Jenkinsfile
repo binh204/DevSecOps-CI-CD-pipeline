@@ -159,36 +159,46 @@ pipeline {
             }
       */
         // 1️⃣ Stage: ZAP Scan
-       stage('ZAP Crawl & Scan') {
+       stage('ZAP Crawl & Active Scan') {
     steps {
         script {
-            sh """
-            docker rm -f zap-daemon || true
-            docker run -d --name zap-daemon \
-                -p 8082:8080 \
-                zaproxy/zap-stable zap.sh -daemon \
-                -config api.key=binh204 \
-                -config api.addrs.addr.name=.* \
-                -config api.addrs.addr.regex=true
+            sh '''
+            echo "🛡 Start OWASP ZAP Daemon MODE (host network)"
 
-            echo "⏳ Wait ZAP..."
-            for i in \$(seq 1 40); do
-                RES=\$(curl -s http://host.docker.internal:8082/JSON/core/view/version/?apikey=binh204)
-                if echo \$RES | grep -q "version"; then
-                    echo "🔥 ZAP READY"
+            mkdir -p $WORKSPACE/zap-reports
+            docker rm -f zap-daemon || true
+
+            docker run -d --name zap-daemon \
+                --network host \
+                -v $WORKSPACE/zap-reports:/zap/wrk \
+                zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0 \
+                -config api.addrs.addr.name=.* \
+                -config api.addrs.addr.regex=true \
+                -config api.disablekey=true
+
+            echo "⏳ Wait ZAP REST API ready..."
+            for i in $(seq 1 60); do
+                if curl -s http://localhost:8080/JSON/core/view/version/ > /dev/null; then
+                    echo "🔥 ZAP API Ready!"
                     break
                 fi
                 sleep 2
             done
 
-            curl "http://host.docker.internal:8082/JSON/spider/action/scan/?apikey=binh204&url=http://172.17.0.1:3000"
-            curl "http://host.docker.internal:8082/JSON/ascan/action/scan/?apikey=binh204&url=http://172.17.0.1:3000"
+            echo "🕷 Spidering..."
+            curl "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
 
-            curl "http://host.docker.internal:8082/OTHER/core/other/htmlreport/?apikey=binh204" \
-                --output $WORKSPACE/zap-reports/zap-report.html
+            echo "⚡ Active Scan..."
+            curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
+
+            echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=" \
+                --output $WORKSPACE/zap-reports/zap-report.xml
 
             docker stop zap-daemon && docker rm zap-daemon
-            """
+            echo "📁 Report saved to workspace/zap-reports"
+            ls -lh $WORKSPACE/zap-reports
+            '''
         }
     }
 }
