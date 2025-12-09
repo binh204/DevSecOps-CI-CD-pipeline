@@ -163,22 +163,26 @@ pipeline {
     steps {
         script {
             sh '''
-            echo "🛡 Start OWASP ZAP Daemon MODE (host network)"
-
+            echo "🛡 Prepare workspace & ZAP config"
             mkdir -p $WORKSPACE/zap-reports
-            docker rm -f zap-daemon || true
 
+            # Create config to disable API key
+            cat > $WORKSPACE/zap.conf <<EOF
+api.key=
+api.disablekey=true
+api.addrs.addr.name=*
+api.addrs.addr.regex=true
+api.enablecors=true
+EOF
+
+            echo "🛡 Start OWASP ZAP (daemon mode, no auth required)"
+
+            docker rm -f zap-daemon || true
             docker run -d --name zap-daemon \
-  --network host \
-  -v $WORKSPACE/zap-reports:/zap/wrk \
-  zaproxy/zap-stable zap.sh -daemon \
-  -port 8080 -host 0.0.0.0 \
-  -config api.key= \
-  -config api.disablekey=true \
-  -config api.addrs.addr.name=.* \
-  -config api.addrs.addr.regex=true \
-  -config api.incerrordetails=true \
-  -config api.enablecors=true
+                --network host \
+                -v $WORKSPACE/zap-reports:/zap/wrk \
+                -v $WORKSPACE/zap.conf:/home/zap/.ZAP/config.xml \
+                zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0
 
             echo "⏳ Wait ZAP REST API ready..."
             for i in $(seq 1 60); do
@@ -189,18 +193,18 @@ pipeline {
                 sleep 2
             done
 
-            echo "🕷 Spidering..."
+            echo "🕷 Spidering target ..."
             curl "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
 
-            echo "⚡ Active Scan..."
+            echo "⚡ Active scanning..."
             curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
 
-            echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
-            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=" \
-                --output $WORKSPACE/zap-reports/zap-report.xml
+            echo "📄 Export report (HTML)"
+            curl "http://localhost:8080/OTHER/core/other/htmlreport/" \
+                --output $WORKSPACE/zap-reports/zap-report.html
 
             docker stop zap-daemon && docker rm zap-daemon
-            echo "📁 Report saved to workspace/zap-reports"
+            echo "📁 Report saved → workspace/zap-reports/"
             ls -lh $WORKSPACE/zap-reports
             '''
         }
