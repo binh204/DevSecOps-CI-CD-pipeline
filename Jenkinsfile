@@ -121,7 +121,7 @@ pipeline {
                 }
             }
         }
-      
+      */
         // 8️⃣ Build Docker Image
         stage('Build Docker Image') {
             steps {
@@ -157,46 +157,49 @@ pipeline {
                     }
                 }
             }
-      */
+      
         // 1️⃣ Stage: ZAP Scan
        stage('ZAP Crawl & Active Scan') {
     steps {
         script {
             sh '''
-            echo "🛡 Start OWASP ZAP Daemon MODE (host network)"
+            echo "🛡 Start OWASP ZAP Daemon in devsecops network"
 
             mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
 
             docker run -d --name zap-daemon \
-                --network host \
+                --network devsecops \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
-                zaproxy/zap-stable zap.sh -daemon -port 8080 -host 0.0.0.0 \
+                zaproxy/zap-stable zap.sh -daemon \
+                -port 8080 -host 0.0.0.0 \
                 -config api.addrs.addr.name=.* \
                 -config api.addrs.addr.regex=true \
                 -config api.disablekey=true
 
-            echo "⏳ Wait ZAP REST API ready..."
+            echo "⏳ Waiting for ZAP REST API ready..."
             for i in $(seq 1 60); do
-                if curl -s http://localhost:8080/JSON/core/view/version/ > /dev/null; then
+                if curl -s http://zap-daemon:8080/JSON/core/view/version/ > /dev/null; then
                     echo "🔥 ZAP API Ready!"
                     break
                 fi
                 sleep 2
             done
 
-            echo "🕷 Spidering..."
-            curl "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000&recurse=true"
+            echo "🕷 Spidering Juice Shop..."
+            curl "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000&recurse=true"
 
-            echo "⚡ Active Scan..."
-            curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
+            echo "⚡ Active Scan Juice Shop..."
+            curl "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000"
 
-            echo "📄 Generating HTML report via API (không spawn ZAP lần 2)"
-            curl "http://localhost:8080/OTHER/core/other/htmlreport/?apikey=" \
+            echo "📄 Generating HTML report..."
+            curl "http://zap-daemon:8080/OTHER/core/other/xmlreport/?apikey=" \
                 --output $WORKSPACE/zap-reports/zap-report.xml
 
+            echo "🧹 Stopping ZAP container..."
             docker stop zap-daemon && docker rm zap-daemon
-            echo "📁 Report saved to workspace/zap-reports"
+
+            echo "📁 Report saved in $WORKSPACE/zap-reports"
             ls -lh $WORKSPACE/zap-reports
             '''
         }
