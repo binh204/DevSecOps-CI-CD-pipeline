@@ -168,6 +168,7 @@ pipeline {
             mkdir -p $WORKSPACE/zap-reports
             docker rm -f zap-daemon || true
 
+            # Start ZAP daemon
             docker run -d --name zap-daemon \
                 --network devsecops \
                 -v $WORKSPACE/zap-reports:/zap/wrk \
@@ -179,21 +180,39 @@ pipeline {
 
             echo "⏳ Waiting for ZAP REST API ready..."
             for i in $(seq 1 60); do
-                if curl -s http://zap-daemon:8080/JSON/core/view/version/ > /dev/null; then
+                if curl -s http://zap-daemon:8080/JSON/core/view/version/ | grep -q "version"; then
                     echo "🔥 ZAP API Ready!"
                     break
                 fi
                 sleep 2
             done
 
-            echo "🕷 Spidering Juice Shop..."
-            curl "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000&recurse=true"
+            echo "🕷 Spidering Juice Shop (root URL)..."
+            SPIDER_ID=$(curl -s "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true" | jq -r '.scan')
+            echo "Spider started with ID: $SPIDER_ID"
 
-            echo "⚡ Active Scan Juice Shop..."
-            curl "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000"
+            # Wait spider to complete
+            echo "⏳ Waiting for spider to finish..."
+            while [ $(curl -s "http://zap-daemon:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | jq -r '.status') != "100" ]; do
+                sleep 5
+                echo "Spider progress: $(curl -s "http://zap-daemon:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | jq -r '.status')%"
+            done
+            echo "Spider finished!"
 
-            echo "📄 Generating HTML report..."
-            curl "http://zap-daemon:8080/OTHER/core/other/xmlreport/?apikey=" \
+            echo "⚡ Starting Active Scan..."
+            ASCAN_ID=$(curl -s "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/" | jq -r '.scan')
+            echo "Active scan started with ID: $ASCAN_ID"
+
+            # Wait active scan to complete
+            echo "⏳ Waiting for active scan to finish..."
+            while [ $(curl -s "http://zap-daemon:8080/JSON/ascan/view/status/?scanId=$ASCAN_ID" | jq -r '.status') != "100" ]; do
+                sleep 10
+                echo "Active scan progress: $(curl -s "http://zap-daemon:8080/JSON/ascan/view/status/?scanId=$ASCAN_ID" | jq -r '.status')%"
+            done
+            echo "Active Scan finished!"
+
+            echo "📄 Generating XML report..."
+            curl -s "http://zap-daemon:8080/OTHER/core/other/xmlreport/?apikey=" \
                 --output $WORKSPACE/zap-reports/zap-report.xml
 
             echo "🧹 Stopping ZAP container..."
@@ -205,6 +224,7 @@ pipeline {
         }
     }
 }
+
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
