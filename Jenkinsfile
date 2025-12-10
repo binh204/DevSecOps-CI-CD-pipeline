@@ -191,7 +191,8 @@ pipeline {
                 echo "Waiting for Juice Shop..."
             sleep 5
             done
-
+            echo "✅ Juice Shop Ready!"
+            
             echo "🕷 Spidering Juice Shop..."
                 curl "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true"
 
