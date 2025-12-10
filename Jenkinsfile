@@ -13,7 +13,6 @@ pipeline {
     }
     
     stages {
-    /*
         // 1️⃣ Checkout code
         stage('Checkout') {
             steps {
@@ -157,7 +156,6 @@ pipeline {
                     }
                 }
             }
-       */
         // 1️⃣ Stage: ZAP Scan
        stage('ZAP Crawl & Active Scan') {
     steps {
