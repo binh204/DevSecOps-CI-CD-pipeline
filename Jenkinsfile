@@ -186,11 +186,17 @@ pipeline {
                 sleep 2
             done
 
+            echo "⏳ Waiting for Juice Shop to be ready..."
+                until curl -s http://juice-app:3000/ > /dev/null; do
+                echo "Waiting for Juice Shop..."
+            sleep 5
+            done
+
             echo "🕷 Spidering Juice Shop..."
-            curl "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000&recurse=true"
+                curl "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true"
 
             echo "⚡ Active Scan Juice Shop..."
-            curl "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000"
+                curl "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/"
 
             echo "📄 Generating HTML report..."
             curl "http://zap-daemon:8080/OTHER/core/other/xmlreport/?apikey=" \
