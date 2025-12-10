@@ -121,7 +121,7 @@ pipeline {
                 }
             }
         }
-      */
+     
         // 8️⃣ Build Docker Image
         stage('Build Docker Image') {
             steps {
@@ -157,7 +157,7 @@ pipeline {
                     }
                 }
             }
-      
+       */
         // 1️⃣ Stage: ZAP Scan
        stage('ZAP Crawl & Active Scan') {
     steps {
