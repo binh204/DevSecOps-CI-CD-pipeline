@@ -178,18 +178,24 @@ pipeline {
                 -config api.disablekey=true
 
             echo "⏳ Waiting for ZAP..."
-            until curl -s http://zap-daemon:8080/JSON/core/view/version/ > /dev/null; do sleep 2; done
+            until curl -s http://zap-daemon:8080/JSON/core/view/version/ > /dev/null; do
+                echo "⏳ ZAP not ready yet..."
+                sleep 2
+            done
             echo "🔥 ZAP Ready!"
 
             echo "⏳ Waiting for JuiceShop..."
-            until curl -s http://juice-app:3000/ > /dev/null; do sleep 5; done
+            until curl -s http://juice-app:3000/ > /dev/null; do
+                echo "Waiting Juice Shop..."
+                sleep 5
+            done
             echo "🍭 Juice Shop Ready!"
 
             echo "🕷 Starting Spider..."
             SPIDER_ID=$(curl -s "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
             echo "Spider ID = $SPIDER_ID"
 
-            echo "⏳ Waiting Spider to reach 100%..."
+            echo "⏳ Waiting for Spider to reach 100%..."
             while true; do
                 PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
                 echo "Spider progress: ${PROGRESS}%"
@@ -198,8 +204,18 @@ pipeline {
             done
             echo "🕸 Spider Complete!"
 
-            echo "⚡ Start Active Scan..."
-            curl "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/"
+            echo "⚡ Starting Active Scan..."
+            ASCAN_ID=$(curl -s "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
+            echo "Active Scan ID = $ASCAN_ID"
+
+            echo "⏳ Waiting for Active Scan to reach 100%..."
+            while true; do
+                ASCAN_PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/ascan/view/status/?scanId=$ASCAN_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
+                echo "Active Scan progress: ${ASCAN_PROGRESS}%"
+                [ "$ASCAN_PROGRESS" = "100" ] && break
+                sleep 5
+            done
+            echo "⚡ Active Scan Complete!"
 
             echo "📄 Exporting XML report..."
             curl "http://zap-daemon:8080/OTHER/core/other/xmlreport/" \
