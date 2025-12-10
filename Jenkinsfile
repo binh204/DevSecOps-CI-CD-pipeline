@@ -163,8 +163,6 @@ pipeline {
     steps {
         script {
             sh '''
-            apt-get update && apt-get install -y jq
-
             echo "🛡 Start OWASP ZAP Daemon in devsecops network"
 
             mkdir -p $WORKSPACE/zap-reports
@@ -179,37 +177,37 @@ pipeline {
                 -config api.addrs.addr.regex=true \
                 -config api.disablekey=true
 
-            echo "⏳ Waiting for ZAP REST API..."
+            echo "⏳ Waiting for ZAP..."
             until curl -s http://zap-daemon:8080/JSON/core/view/version/ > /dev/null; do sleep 2; done
-            echo "🔥 ZAP API Ready!"
+            echo "🔥 ZAP Ready!"
 
-            echo "⏳ Waiting for Juice Shop..."
+            echo "⏳ Waiting for JuiceShop..."
             until curl -s http://juice-app:3000/ > /dev/null; do sleep 5; done
-            echo "✅ Juice Shop Ready!"
+            echo "🍭 Juice Shop Ready!"
 
             echo "🕷 Starting Spider..."
-            SPIDER_ID=$(curl -s "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true" | jq -r .scan)
+            SPIDER_ID=$(curl -s "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
             echo "Spider ID = $SPIDER_ID"
 
-            echo "⏳ Waiting for Spider..."
+            echo "⏳ Waiting Spider to reach 100%..."
             while true; do
-                PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | jq -r .status)
+                PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
                 echo "Spider progress: ${PROGRESS}%"
                 [ "$PROGRESS" = "100" ] && break
                 sleep 3
             done
-            echo "🕷 Spider Complete!"
+            echo "🕸 Spider Complete!"
 
-            echo "⚡ Running Active Scan..."
+            echo "⚡ Start Active Scan..."
             curl "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/"
 
-            echo "📄 Exporting report..."
+            echo "📄 Exporting XML report..."
             curl "http://zap-daemon:8080/OTHER/core/other/xmlreport/" \
                 --output $WORKSPACE/zap-reports/zap-report.xml
 
             docker stop zap-daemon && docker rm zap-daemon
 
-            echo "📁 Reports saved in $WORKSPACE/zap-reports"
+            echo "📁 Scan completed. Reports saved in zap-reports/"
             ls -lh $WORKSPACE/zap-reports
             '''
         }
