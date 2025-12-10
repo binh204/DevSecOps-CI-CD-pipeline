@@ -187,23 +187,37 @@ pipeline {
             done
 
             echo "⏳ Waiting for Juice Shop to be ready..."
-                until curl -s http://juice-app:3000/ > /dev/null; do
+            until curl -s http://juice-app:3000/ > /dev/null; do
                 echo "Waiting for Juice Shop..."
-            sleep 5
+                sleep 5
             done
             echo "✅ Juice Shop Ready!"
-            
-            echo "🕷 Spidering Juice Shop..."
-                curl "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true"
 
-            echo "⚡ Active Scan Juice Shop..."
-                curl "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/"
 
-            echo "📄 Generating HTML report..."
-            curl "http://zap-daemon:8080/OTHER/core/other/xmlreport/?apikey=" \
+            echo "🕷 Starting Spider..."
+            SPIDER_ID=$(curl -s "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true" | jq -r .scan)
+            echo "Spider ID = $SPIDER_ID"
+
+
+            echo "⏳ Waiting for Spider to complete..."
+            while true; do
+                PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | jq -r .status)
+                echo "Spider progress: ${PROGRESS}%"
+                [ "$PROGRESS" = "100" ] && break
+                sleep 3
+            done
+            echo "🕷 Spider Complete!"
+
+
+            echo "⚡ Active Scanning..."
+            curl "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/"
+
+
+            echo "📄 Generating Report..."
+            curl "http://zap-daemon:8080/OTHER/core/other/xmlreport/" \
                 --output $WORKSPACE/zap-reports/zap-report.xml
 
-            echo "🧹 Stopping ZAP container..."
+            echo "🧹 Cleaning ZAP container..."
             docker stop zap-daemon && docker rm zap-daemon
 
             echo "📁 Report saved in $WORKSPACE/zap-reports"
@@ -212,7 +226,6 @@ pipeline {
         }
     }
 }
-
 
 // 2️⃣ Stage: Upload ZAP report to DefectDojo
 stage('Upload ZAP Report to DefectDojo') {
