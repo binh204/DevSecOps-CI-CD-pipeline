@@ -22,7 +22,7 @@ pipeline {
         }
 
         // 2️⃣ SonarQube static analysis
-        stage('SonarQube Analysis') {
+        stage('SonarQube Stactic Code Analysis') {
             steps {
                 script {
                     def scannerHome = tool name: 'SonarQube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
