@@ -174,6 +174,9 @@ pipeline {
                         echo "$DOCKER_CREDS_PSW" | docker login ${DOCKER_REGISTRY} \
                             -u "$DOCKER_CREDS_USR" --password-stdin
 
+                        echo "🚀 Pushing image to registry..."
+                        docker push \$FULL_IMAGE
+                        
                         echo "📎 Attaching SBOM to image..."
                         cosign attach sbom \
                           --sbom ${WORKSPACE}/sbom-juice-shop.json \
@@ -181,9 +184,6 @@ pipeline {
 
                         echo "✍️ Signing image with Cosign..."
                         cosign sign --yes \$FULL_IMAGE
-
-                        echo "🚀 Pushing image to registry..."
-                        docker push \$FULL_IMAGE
 
                         echo "✅ Image tagged, signed, SBOM attached and pushed successfully!"
                     """
