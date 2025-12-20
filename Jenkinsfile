@@ -165,6 +165,7 @@ pipeline {
             steps {
                 script {
                     withCredentials([file(credentialsId: 'Cosign-private-key', variable: 'COSIGN_KEY_FILE')]) {
+                         withEnv(['COSIGN_PASSWORD=']) {
                     sh """
                         FULL_IMAGE=${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_NUMBER}
 
@@ -190,6 +191,7 @@ pipeline {
                     """
                 }
             }
+        }
         }
         }
         // 6️⃣ Deploy -----------------------------------------------------------------------------------------------
