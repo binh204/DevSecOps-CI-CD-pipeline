@@ -60,6 +60,27 @@ pipeline {
                 }
             }
         }
+
+        // 6️⃣ Upload Sonar report to DefectDojo
+         stage('Upload Sonar Report to DefectDojo') {
+            steps {
+                script {
+                    sh """
+                        curl -s -u '${SONARQUBE_TOKEN}:' \
+                        '${SONAR_HOST}/api/issues/search?projectKeys=${PROJECT_KEY}&ps=500' \
+                        -o ${WORKSPACE}/sonar-report.json
+                    """
+
+                    sh """
+                        curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
+                        -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                        -F 'scan_type=SonarQube Scan' \
+                        -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                        -F 'file=@${WORKSPACE}/sonar-report.json'
+                    """
+                }
+            }
+        }
 */
  // 8️⃣ Build Docker Image
         stage('Build Docker Image') {
@@ -117,30 +138,8 @@ stage('Trivy Image SBOM & SCA Scan') {
         }
     }
 }
-/*
-        // 6️⃣ Upload Sonar report to DefectDojo
-         stage('Upload Sonar Report to DefectDojo') {
-            steps {
-                script {
-                    sh """
-                        curl -s -u '${SONARQUBE_TOKEN}:' \
-                        '${SONAR_HOST}/api/issues/search?projectKeys=${PROJECT_KEY}&ps=500' \
-                        -o ${WORKSPACE}/sonar-report.json
-                    """
 
-                    sh """
-                        curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
-                        -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
-                        -F 'scan_type=SonarQube Scan' \
-                        -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
-                        -F 'file=@${WORKSPACE}/sonar-report.json'
-                    """
-                }
-            }
-        }
-
-
-        // 7️⃣ Upload Trivy report to DefectDojo
+    // 7️⃣ Upload Trivy report to DefectDojo
         stage('Upload Trivy Report to DefectDojo') {
             steps {
                 script {
@@ -154,9 +153,7 @@ stage('Trivy Image SBOM & SCA Scan') {
                 }
             }
         }
-     
-       
-
+/*
         // 9️⃣ Run Docker container
         stage('Run Juice Shop Container') {
             steps {
