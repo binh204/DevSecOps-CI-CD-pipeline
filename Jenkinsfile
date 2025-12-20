@@ -14,8 +14,7 @@ pipeline {
         DOCKER_REGISTRY = 'docker.io'
         DOCKER_IMAGE = 'binh204/juice-shop'
 
-        DOCKER_USERNAME = credentials('binh204')
-        DOCKER_PASSWORD = credentials('Binh02122004.')
+        DOCKER_CREDS = credentials('dockerhub-credential')
 
     }
     
@@ -172,8 +171,8 @@ pipeline {
                         docker tag juice-shop:${BUILD_NUMBER} \$FULL_IMAGE
 
                         echo "🔐 Login to Docker Registry..."
-                        echo "${DOCKER_PASSWORD}" | docker login ${DOCKER_REGISTRY} \
-                            -u "${DOCKER_USERNAME}" --password-stdin
+                        echo "${$DOCKER_CREDS_PSW}" | docker login ${DOCKER_REGISTRY} \
+                            -u "${DOCKER_CREDS_USR}" --password-stdin
 
                         echo "📎 Attaching SBOM to image..."
                         cosign attach sbom \
