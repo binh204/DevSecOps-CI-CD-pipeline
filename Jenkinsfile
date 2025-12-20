@@ -182,8 +182,8 @@ pipeline {
                           --sbom ${WORKSPACE}/sbom-juice-shop.json \
                           \$FULL_IMAGE
 
-                        echo "✍️ Signing image with Cosign..."
-                        cosign sign --yes \$FULL_IMAGE
+                        echo "✍️ Signing image with Cosign key pair..."
+                        cosign sign --key /path/to/cosign.key \$FULL_IMAGE
 
                         echo "✅ Image tagged, pushed, signed, and SBOM attached successfully!"
                     """
