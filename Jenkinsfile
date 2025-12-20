@@ -164,6 +164,7 @@ pipeline {
         stage('Tag, SBOM, Sign & Push Image') {
             steps {
                 script {
+                    withCredentials([file(credentialsId: 'Cosign-private-key', variable: 'COSIGN_KEY_FILE')]) {
                     sh """
                         FULL_IMAGE=${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_NUMBER}
 
@@ -183,14 +184,14 @@ pipeline {
                           \$FULL_IMAGE
 
                         echo "✍️ Signing image with Cosign key pair..."
-                        cosign sign --key /path/to/cosign.key \$FULL_IMAGE
+                        cosign sign --key \$COSIGN_KEY_FILE \$FULL_IMAGEE
 
                         echo "✅ Image tagged, pushed, signed, and SBOM attached successfully!"
                     """
                 }
             }
         }
-        
+        }
         // 6️⃣ Deploy -----------------------------------------------------------------------------------------------
         //Run container
         stage('Run Juice Shop Container') {
