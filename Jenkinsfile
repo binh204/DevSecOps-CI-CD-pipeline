@@ -13,6 +13,7 @@ pipeline {
     }
     
     stages {
+/*
         // 1️⃣ Checkout code
         stage('Checkout') {
             steps {
@@ -59,31 +60,64 @@ pipeline {
                 }
             }
         }
-
-        // 5️⃣ Trivy scan (ephemeral container)
-        stage('Trivy FS Scan & Upload') {
+*/
+ // 8️⃣ Build Docker Image
+        stage('Build Docker Image') {
             steps {
                 script {
-                    sh """
-                        echo "🛡 Running Trivy scan using Jenkins volume..."
-    
-                        docker run --rm \
-                            -v jenkins_home:/var/jenkins_home \
-                            aquasec/trivy:latest fs /var/jenkins_home/workspace/DevSecOps/juice-shop \
-                            --format json \
-                            --output /var/jenkins_home/workspace/DevSecOps/trivy-report.json \
-                            --debug || true
-
-                            if [ -f "${WORKSPACE}/trivy-report.json" ]; then
-                                echo "✅ Trivy report created successfully!"
-                            else
-                                echo "❌ Trivy report NOT created!"
-                            fi
-                            """
+                    echo "🚀 Building Docker image from Juice Shop source..."
+                    dockerImage = docker.build(
+                        "juice-shop:${env.BUILD_NUMBER}",
+                        "./juice-shop"
+                    )
                 }
             }
         }
+        
+        // 5️⃣ Trivy Image SBOM & SCA Scan
+stage('Trivy Image SBOM & SCA Scan') {
+    steps {
+        script {
+            sh """
+                echo "📦 Generating SBOM from Docker image..."
 
+                docker run --rm \
+                  -v /var/run/docker.sock:/var/run/docker.sock \
+                  -v jenkins_home:/var/jenkins_home \
+                  aquasec/trivy:latest image \
+                  juice-shop:${BUILD_NUMBER} \
+                  --format cyclonedx \
+                  --output /var/jenkins_home/workspace/DevSecOps/sbom-juice-shop.json \
+                  --debug
+
+                if [ -f "${WORKSPACE}/sbom-juice-shop.json" ]; then
+                    echo "✅ SBOM generated successfully!"
+                else
+                    echo "❌ SBOM generation failed!"
+                    exit 1
+                fi
+
+                echo "🔍 Running SCA scan using SBOM as input..."
+
+                docker run --rm \
+                  -v jenkins_home:/var/jenkins_home \
+                  aquasec/trivy:latest sbom \
+                  /var/jenkins_home/workspace/DevSecOps/sbom-juice-shop.json \
+                  --format json \
+                  --output /var/jenkins_home/workspace/DevSecOps/trivy-report.json \
+                  --severity HIGH,CRITICAL \
+                  --debug || true
+
+                if [ -f "${WORKSPACE}/trivy-report.json" ]; then
+                    echo "✅ Trivy SCA report created successfully!"
+                else
+                    echo "❌ Trivy SCA report NOT created!"
+                fi
+            """
+        }
+    }
+}
+/*
         // 6️⃣ Upload Sonar report to DefectDojo
          stage('Upload Sonar Report to DefectDojo') {
             steps {
@@ -121,18 +155,7 @@ pipeline {
             }
         }
      
-        // 8️⃣ Build Docker Image
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    echo "🚀 Building Docker image from Juice Shop source..."
-                    dockerImage = docker.build(
-                        "juice-shop:${env.BUILD_NUMBER}",
-                        "./juice-shop"
-                    )
-                }
-            }
-        }
+       
 
         // 9️⃣ Run Docker container
         stage('Run Juice Shop Container') {
@@ -156,6 +179,7 @@ pipeline {
                     }
                 }
             }
+*/            
         // 1️⃣ Stage: ZAP Scan
        stage('ZAP Crawl & Active Scan') {
     steps {
