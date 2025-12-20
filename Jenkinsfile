@@ -185,12 +185,12 @@ pipeline {
                         echo "✍️ Signing image with Cosign..."
                         cosign sign --yes \$FULL_IMAGE
 
-                        echo "✅ Image tagged, signed, SBOM attached and pushed successfully!"
+                        echo "✅ Image tagged, pushed, signed, and SBOM attached successfully!"
                     """
                 }
             }
         }
-/*
+        
         // 6️⃣ Deploy -----------------------------------------------------------------------------------------------
         //Run container
         stage('Run Juice Shop Container') {
@@ -201,6 +201,7 @@ pipeline {
                         def previousBuild = env.BUILD_NUMBER.toInteger() - 1
                         if (previousBuild > 0) {
                         sh "docker rmi -f juice-shop:${previousBuild} || true"
+                        sh "docker rmi -f binh204/juice-shop:${previousBuild} || true"
                         }
  
                     echo "🏃 Running container from image..."
@@ -214,7 +215,7 @@ pipeline {
                     }
                 }
             }
- */        
+        
         //ZAP Scan
         stage('ZAP Crawl & Active Scan') {
             steps {
