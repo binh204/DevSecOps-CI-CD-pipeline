@@ -171,8 +171,8 @@ pipeline {
                         docker tag juice-shop:${BUILD_NUMBER} \$FULL_IMAGE
 
                         echo "🔐 Login to Docker Registry..."
-                        echo "${$DOCKER_CREDS_PSW}" | docker login ${DOCKER_REGISTRY} \
-                            -u "${DOCKER_CREDS_USR}" --password-stdin
+                        echo "$DOCKER_CREDS_PSW" | docker login ${DOCKER_REGISTRY} \
+                            -u "$DOCKER_CREDS_USR" --password-stdin
 
                         echo "📎 Attaching SBOM to image..."
                         cosign attach sbom \
