@@ -10,6 +10,13 @@ pipeline {
 
         DEFECTDOJO_URL = 'http://192.168.73.36:8090'
         DEFECTDOJO_ENGAGEMENT_ID = '2'
+
+        DOCKER_REGISTRY = 'docker.io'
+        DOCKER_IMAGE = 'binh204/juice-shop'
+
+        DOCKER_USERNAME = credentials('binh204')
+        DOCKER_PASSWORD = credentials('Binh02122004.')
+
     }
     
     stages {  
@@ -33,7 +40,7 @@ pipeline {
                 }
             }
         }
-
+/*
         // 4️⃣ Testing Stage -----------------------------------------------------------------------------------------------    
         stage('SonarQube Stactic Code Analysis') {
             steps {
@@ -152,7 +159,39 @@ pipeline {
                 }
             }
         }
+*/
+        // 5️⃣ Release -----------------------------------------------------------------------------------------------
+        // Image Supply Chain: Tag, Attach SBOM, Sign & Push
+        stage('Tag, SBOM, Sign & Push Image') {
+            steps {
+                script {
+                    sh """
+                        FULL_IMAGE=${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_NUMBER}
 
+                        echo "🏷 Tagging image..."
+                        docker tag juice-shop:${BUILD_NUMBER} \$FULL_IMAGE
+
+                        echo "🔐 Login to Docker Registry..."
+                        echo "${DOCKER_PASSWORD}" | docker login ${DOCKER_REGISTRY} \
+                            -u "${DOCKER_USERNAME}" --password-stdin
+
+                        echo "📎 Attaching SBOM to image..."
+                        cosign attach sbom \
+                          --sbom ${WORKSPACE}/sbom-juice-shop.json \
+                          \$FULL_IMAGE
+
+                        echo "✍️ Signing image with Cosign..."
+                        cosign sign --yes \$FULL_IMAGE
+
+                        echo "🚀 Pushing image to registry..."
+                        docker push \$FULL_IMAGE
+
+                        echo "✅ Image tagged, signed, SBOM attached and pushed successfully!"
+                    """
+                }
+            }
+        }
+/*
         // 6️⃣ Deploy -----------------------------------------------------------------------------------------------
         //Run container
         stage('Run Juice Shop Container') {
@@ -176,7 +215,7 @@ pipeline {
                     }
                 }
             }
-         
+ */        
         //ZAP Scan
         stage('ZAP Crawl & Active Scan') {
             steps {
@@ -263,6 +302,7 @@ pipeline {
                 }
             }
         }
+       // ---------------------------------------------------------------------------------------------------------------------------------
  }
     post {
         success { echo '✅ Pipeline completed successfully!' }
