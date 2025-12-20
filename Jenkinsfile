@@ -185,7 +185,7 @@ pipeline {
                           \$FULL_IMAGE
 
                         echo "✍️ Signing image with Cosign key pair..."
-                        cosign sign --key \$COSIGN_KEY_FILE \$FULL_IMAGE
+                        cosign sign --key \$COSIGN_KEY_FILE \$DIGEST
 
                         echo "✅ Image tagged, pushed, signed, and SBOM attached successfully!"
                     """
