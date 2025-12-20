@@ -186,7 +186,7 @@ pipeline {
 
                         echo "✍️ Signing image with Cosign key pair..."
                         DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$FULL_IMAGE)
-                        cosign sign --key \$COSIGN_KEY_FILE \$DIGEST
+                        COSIGN_PASSWORD="" cosign sign --key \$COSIGN_KEY_FILE \$DIGEST
 
                         echo "✅ Image tagged, pushed, signed, and SBOM attached successfully!"
                     """
