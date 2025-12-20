@@ -12,17 +12,29 @@ pipeline {
         DEFECTDOJO_ENGAGEMENT_ID = '2'
     }
     
-    stages {
-/*
-        // 1️⃣ Checkout code
-        stage('Checkout') {
+    stages {  
+        // 2️⃣ Checkout code -----------------------------------------------------------------------------------------------
+        stage('Checkout code') {
             steps {
                 git branch: 'main', credentialsId: 'github-credentials',
                     url: 'https://github.com/binh204/DevSecOps'
             }
         }
 
-        // 2️⃣ SonarQube static analysis
+        // 3️⃣ Build Docker Image ------------------------------------------------------------------------------------------        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo "🚀 Building Docker image from Juice Shop source..."
+                    dockerImage = docker.build(
+                        "juice-shop:${env.BUILD_NUMBER}",
+                        "./juice-shop"
+                    )
+                }
+            }
+        }
+
+        // 4️⃣ Testing Stage -----------------------------------------------------------------------------------------------    
         stage('SonarQube Stactic Code Analysis') {
             steps {
                 script {
@@ -39,12 +51,12 @@ pipeline {
             }
         }
 
-        // 3️⃣ Wait for SonarQube processing
+        // Wait for SonarQube processing
         stage('Wait for Processing') {
             steps { sleep time: 2, unit: 'MINUTES' }
         }
 
-        // 4️⃣ Quality Gate
+        // Quality Gate
         stage('Quality Gate') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
@@ -61,7 +73,7 @@ pipeline {
             }
         }
 
-        // 6️⃣ Upload Sonar report to DefectDojo
+        // Upload Sonar report to DefectDojo
          stage('Upload Sonar Report to DefectDojo') {
             steps {
                 script {
@@ -81,65 +93,52 @@ pipeline {
                 }
             }
         }
-*/
- // 8️⃣ Build Docker Image
-        stage('Build Docker Image') {
+        
+        //Trivy Image SBOM & SCA Scan
+        stage('Trivy Image SBOM & SCA Scan') {
             steps {
                 script {
-                    echo "🚀 Building Docker image from Juice Shop source..."
-                    dockerImage = docker.build(
-                        "juice-shop:${env.BUILD_NUMBER}",
-                        "./juice-shop"
-                    )
+                    sh """
+                        echo "📦 Generating SBOM from Docker image..."
+        
+                        docker run --rm \
+                          -v /var/run/docker.sock:/var/run/docker.sock \
+                          -v jenkins_home:/var/jenkins_home \
+                          aquasec/trivy:latest image \
+                          juice-shop:${BUILD_NUMBER} \
+                          --format cyclonedx \
+                          --output /var/jenkins_home/workspace/DevSecOps/sbom-juice-shop.json \
+                          --debug
+        
+                        if [ -f "${WORKSPACE}/sbom-juice-shop.json" ]; then
+                            echo "✅ SBOM generated successfully!"
+                        else
+                            echo "❌ SBOM generation failed!"
+                            exit 1
+                        fi
+        
+                        echo "🔍 Running SCA scan using SBOM as input..."
+        
+                        docker run --rm \
+                          -v jenkins_home:/var/jenkins_home \
+                          aquasec/trivy:latest sbom \
+                          /var/jenkins_home/workspace/DevSecOps/sbom-juice-shop.json \
+                          --format json \
+                          --output /var/jenkins_home/workspace/DevSecOps/trivy-report.json \
+                          --severity HIGH,CRITICAL \
+                          --debug || true
+        
+                        if [ -f "${WORKSPACE}/trivy-report.json" ]; then
+                            echo "✅ Trivy SCA report created successfully!"
+                        else
+                            echo "❌ Trivy SCA report NOT created!"
+                        fi
+                    """
                 }
             }
         }
-        
-        // 5️⃣ Trivy Image SBOM & SCA Scan
-stage('Trivy Image SBOM & SCA Scan') {
-    steps {
-        script {
-            sh """
-                echo "📦 Generating SBOM from Docker image..."
 
-                docker run --rm \
-                  -v /var/run/docker.sock:/var/run/docker.sock \
-                  -v jenkins_home:/var/jenkins_home \
-                  aquasec/trivy:latest image \
-                  juice-shop:${BUILD_NUMBER} \
-                  --format cyclonedx \
-                  --output /var/jenkins_home/workspace/DevSecOps/sbom-juice-shop.json \
-                  --debug
-
-                if [ -f "${WORKSPACE}/sbom-juice-shop.json" ]; then
-                    echo "✅ SBOM generated successfully!"
-                else
-                    echo "❌ SBOM generation failed!"
-                    exit 1
-                fi
-
-                echo "🔍 Running SCA scan using SBOM as input..."
-
-                docker run --rm \
-                  -v jenkins_home:/var/jenkins_home \
-                  aquasec/trivy:latest sbom \
-                  /var/jenkins_home/workspace/DevSecOps/sbom-juice-shop.json \
-                  --format json \
-                  --output /var/jenkins_home/workspace/DevSecOps/trivy-report.json \
-                  --severity HIGH,CRITICAL \
-                  --debug || true
-
-                if [ -f "${WORKSPACE}/trivy-report.json" ]; then
-                    echo "✅ Trivy SCA report created successfully!"
-                else
-                    echo "❌ Trivy SCA report NOT created!"
-                fi
-            """
-        }
-    }
-}
-
-    // 7️⃣ Upload Trivy report to DefectDojo
+       //Upload Trivy report to DefectDojo
         stage('Upload Trivy Report to DefectDojo') {
             steps {
                 script {
@@ -153,8 +152,9 @@ stage('Trivy Image SBOM & SCA Scan') {
                 }
             }
         }
-/*
-        // 9️⃣ Run Docker container
+
+        // 6️⃣ Deploy -----------------------------------------------------------------------------------------------
+        //Run container
         stage('Run Juice Shop Container') {
             steps {
                 script {
@@ -176,94 +176,94 @@ stage('Trivy Image SBOM & SCA Scan') {
                     }
                 }
             }
-*/            
-        // 1️⃣ Stage: ZAP Scan
-       stage('ZAP Crawl & Active Scan') {
-    steps {
-        script {
-            sh '''
-            echo "🛡 Start OWASP ZAP Daemon in devsecops network"
-
-            mkdir -p $WORKSPACE/zap-reports
-            docker rm -f zap-daemon || true
-
-            docker run -d --name zap-daemon \
-                --network devsecops \
-                -v $WORKSPACE/zap-reports:/zap/wrk \
-                zaproxy/zap-stable zap.sh -daemon \
-                -port 8080 -host 0.0.0.0 \
-                -config api.addrs.addr.name=.* \
-                -config api.addrs.addr.regex=true \
-                -config api.disablekey=true
-
-            echo "⏳ Waiting for ZAP..."
-            until curl -s http://zap-daemon:8080/JSON/core/view/version/ > /dev/null; do
-                echo "⏳ ZAP not ready yet..."
-                sleep 2
-            done
-            echo "🔥 ZAP Ready!"
-
-            echo "⏳ Waiting for JuiceShop..."
-            until curl -s http://juice-app:3000/ > /dev/null; do
-                echo "Waiting Juice Shop..."
-                sleep 5
-            done
-            echo "🍭 Juice Shop Ready!"
-
-            echo "🕷 Starting Spider..."
-            SPIDER_ID=$(curl -s "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
-            echo "Spider ID = $SPIDER_ID"
-
-            echo "⏳ Waiting for Spider to reach 100%..."
-            while true; do
-                PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
-                echo "Spider progress: ${PROGRESS}%"
-                [ "$PROGRESS" = "100" ] && break
-                sleep 3
-            done
-            echo "🕸 Spider Complete!"
-
-            echo "⚡ Starting Active Scan..."
-            ASCAN_ID=$(curl -s "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
-            echo "Active Scan ID = $ASCAN_ID"
-
-            echo "⏳ Waiting for Active Scan to reach 100%..."
-            while true; do
-                ASCAN_PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/ascan/view/status/?scanId=$ASCAN_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
-                echo "Active Scan progress: ${ASCAN_PROGRESS}%"
-                [ "$ASCAN_PROGRESS" = "100" ] && break
-                sleep 5
-            done
-            echo "⚡ Active Scan Complete!"
-
-            echo "📄 Exporting XML report..."
-            curl "http://zap-daemon:8080/OTHER/core/other/xmlreport/" \
-                --output $WORKSPACE/zap-reports/zap-report.xml
-
-            docker stop zap-daemon && docker rm zap-daemon
-
-            echo "📁 Scan completed. Reports saved in zap-reports/"
-            ls -lh $WORKSPACE/zap-reports
-            '''
+         
+        //ZAP Scan
+        stage('ZAP Crawl & Active Scan') {
+            steps {
+                script {
+                    sh '''
+                    echo "🛡 Start OWASP ZAP Daemon in devsecops network"
+        
+                    mkdir -p $WORKSPACE/zap-reports
+                    docker rm -f zap-daemon || true
+        
+                    docker run -d --name zap-daemon \
+                        --network devsecops \
+                        -v $WORKSPACE/zap-reports:/zap/wrk \
+                        zaproxy/zap-stable zap.sh -daemon \
+                        -port 8080 -host 0.0.0.0 \
+                        -config api.addrs.addr.name=.* \
+                        -config api.addrs.addr.regex=true \
+                        -config api.disablekey=true
+        
+                    echo "⏳ Waiting for ZAP..."
+                    until curl -s http://zap-daemon:8080/JSON/core/view/version/ > /dev/null; do
+                        echo "⏳ ZAP not ready yet..."
+                        sleep 2
+                    done
+                    echo "🔥 ZAP Ready!"
+        
+                    echo "⏳ Waiting for JuiceShop..."
+                    until curl -s http://juice-app:3000/ > /dev/null; do
+                        echo "Waiting Juice Shop..."
+                        sleep 5
+                    done
+                    echo "🍭 Juice Shop Ready!"
+        
+                    echo "🕷 Starting Spider..."
+                    SPIDER_ID=$(curl -s "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
+                    echo "Spider ID = $SPIDER_ID"
+        
+                    echo "⏳ Waiting for Spider to reach 100%..."
+                    while true; do
+                        PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
+                        echo "Spider progress: ${PROGRESS}%"
+                        [ "$PROGRESS" = "100" ] && break
+                        sleep 3
+                    done
+                    echo "🕸 Spider Complete!"
+        
+                    echo "⚡ Starting Active Scan..."
+                    ASCAN_ID=$(curl -s "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
+                    echo "Active Scan ID = $ASCAN_ID"
+        
+                    echo "⏳ Waiting for Active Scan to reach 100%..."
+                    while true; do
+                        ASCAN_PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/ascan/view/status/?scanId=$ASCAN_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
+                        echo "Active Scan progress: ${ASCAN_PROGRESS}%"
+                        [ "$ASCAN_PROGRESS" = "100" ] && break
+                        sleep 5
+                    done
+                    echo "⚡ Active Scan Complete!"
+        
+                    echo "📄 Exporting XML report..."
+                    curl "http://zap-daemon:8080/OTHER/core/other/xmlreport/" \
+                        --output $WORKSPACE/zap-reports/zap-report.xml
+        
+                    docker stop zap-daemon && docker rm zap-daemon
+        
+                    echo "📁 Scan completed. Reports saved in zap-reports/"
+                    ls -lh $WORKSPACE/zap-reports
+                    '''
+                }
+            }
         }
-    }
-}
 
-// 2️⃣ Stage: Upload ZAP report to DefectDojo
-stage('Upload ZAP Report to DefectDojo') {
-    steps {
-        script {
-            sh """
-            curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
-                 -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
-                 -F 'scan_type=ZAP Scan' \
-                 -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
-                 -F 'file=@${WORKSPACE}/zap-reports/zap-report.xml'
-            """
+        //Upload ZAP report to DefectDojo
+        stage('Upload ZAP Report to DefectDojo') {
+            steps {
+                script {
+                    sh """
+                    curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
+                         -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                         -F 'scan_type=ZAP Scan' \
+                         -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                         -F 'file=@${WORKSPACE}/zap-reports/zap-report.xml'
+                    """
+                }
+            }
         }
-    }
-}
-        }
+ }
     post {
         success { echo '✅ Pipeline completed successfully!' }
         failure { echo '❌ Pipeline failed!' }
