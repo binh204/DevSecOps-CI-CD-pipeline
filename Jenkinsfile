@@ -258,10 +258,10 @@ pipeline {
                           --certificate-oidc-issuer https://github.com/login/oauth
 
                         echo "📦 Verifying SBOM ATTESTATION"
-                        cosign verify-attestation \$DIGEST \
+                        cosign verify-attestation \
+                          --key cosign.pub \
                           --type spdxjson \
-                          --certificate-identity-regexp ".*" \
-                          --certificate-oidc-issuer https://github.com/login/oauth
+                          $DIGEST
         
                         echo "🚀 Running container on Staging"
                         docker run -d \
