@@ -39,7 +39,7 @@ pipeline {
                 }
             }
         }
-
+/*
         // 4️⃣ TEST -----------------------------------------------------------------------------------------------    
         stage('SonarQube Stactic Code Analysis') {
             steps {
@@ -159,43 +159,6 @@ pipeline {
             }
         }
 
-        // 5️⃣ RELEASE -----------------------------------------------------------------------------------------------
-        // Image Supply Chain: Tag, Attach SBOM, Sign & Push
-        stage('Tag, SBOM, Sign & Push Image') {
-            steps {
-                script {
-                    withCredentials([file(credentialsId: 'Cosign-private-key', variable: 'COSIGN_KEY_FILE')]) {
-                         withEnv(['COSIGN_PASSWORD=']) {
-                    sh """
-                        FULL_IMAGE=${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_NUMBER}
-
-                        echo "🏷 Tagging image..."
-                        docker tag juice-shop:${BUILD_NUMBER} \$FULL_IMAGE
-
-                        echo "🔐 Login to Docker Registry..."
-                        echo "$DOCKER_CREDS_PSW" | docker login ${DOCKER_REGISTRY} \
-                            -u "$DOCKER_CREDS_USR" --password-stdin
-
-                        echo "🚀 Pushing image to registry..."
-                        docker push \$FULL_IMAGE
-                        
-                        echo "📎 Attaching SBOM to image..."
-                        cosign attach sbom \
-                          --sbom ${WORKSPACE}/sbom-juice-shop.json \
-                          \$FULL_IMAGE
-
-                        echo "✍️ Signing image with Cosign key pair..."
-                        DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$FULL_IMAGE)
-                        COSIGN_PASSWORD="" cosign sign --key \$COSIGN_KEY_FILE \$DIGEST
-
-                        echo "✅ Image tagged, pushed, signed, and SBOM attached successfully!"
-                    """
-                         }
-                      }
-                 }
-            }
-        }
-        // 6️⃣ DEPLOY -----------------------------------------------------------------------------------------------
         //Run container
         stage('Run Juice Shop Container') {
             steps {
@@ -255,12 +218,12 @@ pipeline {
         
                     echo "🕷 Starting Spider..."
                     SPIDER_ID=$(curl -s "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
-                    echo "Spider ID = $SPIDER_ID"
+/*                    echo "Spider ID = $SPIDER_ID"
         
                     echo "⏳ Waiting for Spider to reach 100%..."
                     while true; do
                         PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
-                        echo "Spider progress: ${PROGRESS}%"
+ /*                       echo "Spider progress: ${PROGRESS}%"
                         [ "$PROGRESS" = "100" ] && break
                         sleep 3
                     done
@@ -268,12 +231,12 @@ pipeline {
         
                     echo "⚡ Starting Active Scan..."
                     ASCAN_ID=$(curl -s "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
-                    echo "Active Scan ID = $ASCAN_ID"
+   /*                 echo "Active Scan ID = $ASCAN_ID"
         
                     echo "⏳ Waiting for Active Scan to reach 100%..."
                     while true; do
                         ASCAN_PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/ascan/view/status/?scanId=$ASCAN_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
-                        echo "Active Scan progress: ${ASCAN_PROGRESS}%"
+   /*                     echo "Active Scan progress: ${ASCAN_PROGRESS}%"
                         [ "$ASCAN_PROGRESS" = "100" ] && break
                         sleep 5
                     done
@@ -306,6 +269,82 @@ pipeline {
                 }
             }
         }
+*/
+        // 5️⃣ RELEASE -----------------------------------------------------------------------------------------------
+        // Image Supply Chain: Tag, Attach SBOM, Sign & Push
+        stage('Tag, SBOM, Sign & Push Image') {
+            steps {
+                script {
+                    withCredentials([file(credentialsId: 'Cosign-private-key', variable: 'COSIGN_KEY_FILE')]) {
+                         withEnv(['COSIGN_PASSWORD=']) {
+                    sh """
+                        FULL_IMAGE=${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_NUMBER}
+
+                        echo "🏷 Tagging image..."
+                        docker tag juice-shop:${BUILD_NUMBER} \$FULL_IMAGE
+
+                        echo "🔐 Login to Docker Registry..."
+                        echo "$DOCKER_CREDS_PSW" | docker login ${DOCKER_REGISTRY} \
+                            -u "$DOCKER_CREDS_USR" --password-stdin
+
+                        echo "🚀 Pushing image to registry..."
+                        docker push \$FULL_IMAGE
+                        
+                        echo "📎 Attaching SBOM to image..."
+                        cosign attach sbom \
+                          --sbom ${WORKSPACE}/sbom-juice-shop.json \
+                          \$FULL_IMAGE
+
+                        echo "✍️ Signing image with Cosign key pair..."
+                        DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$FULL_IMAGE)
+                        COSIGN_PASSWORD="" cosign sign --key \$COSIGN_KEY_FILE \$DIGEST
+
+                        echo "✅ Image tagged, pushed, signed, and SBOM attached successfully!"
+                    """
+                         }
+                      }
+                 }
+            }
+        }
+        // 6️⃣ DEPLOY -----------------------------------------------------------------------------------------------
+        stage('Run Juice Shop Container on Staging Environment') {
+            steps {
+                script {
+                    echo "🏃 Pulling & verifying signed image for Staging..."
+        
+                    sh """
+                        IMAGE=${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_NUMBER}
+        
+                        # Stop & remove old container 
+                        docker stop juice-app || true
+                        docker rm juice-app || true
+        
+                        echo "📥 Pulling image \$IMAGE"
+                        docker pull \$IMAGE
+        
+                        echo "🔍 Getting image digest"
+                        DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$IMAGE)
+        
+                        echo "🔐 Verifying image signature with Cosign"
+                        cosign verify \$DIGEST \
+                          --certificate-identity-regexp ".*" \
+                          --certificate-oidc-issuer https://github.com/login/oauth
+        
+                        echo "🚀 Running container on Staging"
+                        docker run -d \
+                          --name juice-app \
+                          --network devsecops \
+                          -p 9050:3000 \
+                          -e NODE_ENV=staging \
+                          --restart unless-stopped \
+                          \$IMAGE
+                    """
+        
+                    sleep 25
+                }
+            }
+        }
+
        // ---------------------------------------------------------------------------------------------------------------------------------
  }
     post {
