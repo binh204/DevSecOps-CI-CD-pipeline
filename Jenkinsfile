@@ -208,6 +208,13 @@ pipeline {
                           --sbom ${WORKSPACE}/sbom-juice-shop.json \
                           \$FULL_IMAGE
 
+                        echo "📦 Attesting SBOM (SPDX attestation)..."
+                        cosign attest \
+                          --predicate ${WORKSPACE}/sbom-juice-shop.json \
+                          --type spdxjson \
+                          --key \$COSIGN_KEY_FILE \
+                          \$DIGEST
+                          
                         echo "✍️ Signing image with Cosign key pair..."
                         DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$FULL_IMAGE)
                         COSIGN_PASSWORD="" cosign sign --key \$COSIGN_KEY_FILE \$DIGEST
@@ -227,6 +234,7 @@ pipeline {
                     echo "🏃 Pulling & verifying signed image for Staging..."
         
                     sh """
+                        set -e
                         IMAGE=${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_NUMBER}
         
                         # Stop & remove old container 
@@ -243,6 +251,12 @@ pipeline {
                         cosign verify \$DIGEST \
                           --certificate-identity-regexp ".*" \
                           --certificate-oidc-issuer https://github.com/login/oauth
+
+                        echo "📦 Verifying SBOM ATTESTATION"
+                        cosign verify-attestation \$DIGEST \
+                          --type spdxjson \
+                          --certificate-identity-regexp ".*" \
+                          --certificate-oidc-issuer https://github.com/login/oauth
         
                         echo "🚀 Running container on Staging"
                         docker run -d \
@@ -253,7 +267,6 @@ pipeline {
                           --restart unless-stopped \
                           \$IMAGE
                     """
-        
                     sleep 25
                 }
             }
