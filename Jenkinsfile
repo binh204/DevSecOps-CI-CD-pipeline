@@ -215,14 +215,14 @@ pipeline {
                                   \$DIGEST
         
                                 echo "📦 Attesting SBOM (SPDX predicate)..."
-                                cosign attest \
+                                COSIGN_PASSWORD="" cosign attest \
                                   --predicate ${WORKSPACE}/sbom-juice-shop.json \
                                   --type spdxjson \
                                   --key \$COSIGN_KEY_FILE \
                                   \$DIGEST
         
                                 echo "✍️ Signing image digest..."
-                                cosign sign --key \$COSIGN_KEY_FILE \$DIGEST
+                                COSIGN_PASSWORD="" cosign sign --key \$COSIGN_KEY_FILE \$DIGEST
         
                                 echo "✅ Image pushed, SBOM attached & attested, image signed successfully!"
                             """
