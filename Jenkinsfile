@@ -189,41 +189,46 @@ pipeline {
             steps {
                 script {
                     withCredentials([file(credentialsId: 'Cosign-private-key', variable: 'COSIGN_KEY_FILE')]) {
-                         withEnv(['COSIGN_PASSWORD=']) {
-                    sh """
-                        FULL_IMAGE=${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_NUMBER}
-
-                        echo "🏷 Tagging image..."
-                        docker tag juice-shop:${BUILD_NUMBER} \$FULL_IMAGE
-
-                        echo "🔐 Login to Docker Registry..."
-                        echo "$DOCKER_CREDS_PSW" | docker login ${DOCKER_REGISTRY} \
-                            -u "$DOCKER_CREDS_USR" --password-stdin
-
-                        echo "🚀 Pushing image to registry..."
-                        docker push \$FULL_IMAGE
-                        
-                        echo "📎 Attaching SBOM to image..."
-                        cosign attach sbom \
-                          --sbom ${WORKSPACE}/sbom-juice-shop.json \
-                          \$FULL_IMAGE
-
-                        echo "📦 Attesting SBOM (SPDX attestation)..."
-                        cosign attest \
-                          --predicate ${WORKSPACE}/sbom-juice-shop.json \
-                          --type spdxjson \
-                          --key \$COSIGN_KEY_FILE \
-                          \$DIGEST
-                          
-                        echo "✍️ Signing image with Cosign key pair..."
-                        DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$FULL_IMAGE)
-                        COSIGN_PASSWORD="" cosign sign --key \$COSIGN_KEY_FILE \$DIGEST
-
-                        echo "✅ Image tagged, pushed, signed, and SBOM attached successfully!"
-                    """
-                         }
-                      }
-                 }
+                        withEnv(['COSIGN_PASSWORD=']) {
+                            sh """
+                                set -e
+        
+                                FULL_IMAGE=${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_NUMBER}
+        
+                                echo "🏷 Tagging image..."
+                                docker tag juice-shop:${BUILD_NUMBER} \$FULL_IMAGE
+        
+                                echo "🔐 Login to Docker Registry..."
+                                echo "$DOCKER_CREDS_PSW" | docker login ${DOCKER_REGISTRY} \
+                                    -u "$DOCKER_CREDS_USR" --password-stdin
+        
+                                echo "🚀 Pushing image to registry..."
+                                docker push \$FULL_IMAGE
+        
+                                echo "🔍 Getting image digest..."
+                                DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$FULL_IMAGE)
+                                echo "Image digest: \$DIGEST"
+        
+                                echo "📎 Attaching SBOM (artifact)..."
+                                cosign attach sbom \
+                                  --sbom ${WORKSPACE}/sbom-juice-shop.json \
+                                  \$DIGEST
+        
+                                echo "📦 Attesting SBOM (SPDX predicate)..."
+                                cosign attest \
+                                  --predicate ${WORKSPACE}/sbom-juice-shop.json \
+                                  --type spdxjson \
+                                  --key \$COSIGN_KEY_FILE \
+                                  \$DIGEST
+        
+                                echo "✍️ Signing image digest..."
+                                cosign sign --key \$COSIGN_KEY_FILE \$DIGEST
+        
+                                echo "✅ Image pushed, SBOM attached & attested, image signed successfully!"
+                            """
+                        }
+                    }
+                }
             }
         }
       
