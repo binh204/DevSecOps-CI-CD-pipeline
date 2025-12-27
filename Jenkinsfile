@@ -236,6 +236,7 @@ pipeline {
         stage('Run Juice Shop Container on Staging Environment') {
             steps {
                 script {
+                    withCredentials([file(credentialsId: 'Cosign-public-key', variable: 'COSIGN_PUB_KEY')]) {
                     echo "🏃 Pulling & verifying signed image for Staging..."
         
                     sh """
@@ -259,7 +260,7 @@ pipeline {
 
                         echo "📦 Verifying SBOM ATTESTATION"
                         cosign verify-attestation \
-                          --key cosign.pub \
+                          --key \$COSIGN_PUB_KEY \
                           --type spdxjson \
                          \$DIGEST
         
