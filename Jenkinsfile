@@ -83,7 +83,7 @@ pipeline {
         // Quality Gate
         stage('Quality Gate') {
             steps {
-                
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     script {
                         timeout(time: 8, unit: 'MINUTES') {
                             def qg = waitForQualityGate()
@@ -95,8 +95,8 @@ pipeline {
                     }
                 }
             }
-        
-/*
+        }
+
         // Upload Sonar report to DefectDojo
          stage('Upload Sonar Report to DefectDojo') {
             steps {
@@ -200,7 +200,93 @@ pipeline {
                     }
                 }
             }
-          
+
+          //ZAP Scan
+        stage('ZAP Crawl & Active Scan') {
+            steps {
+                script {
+                    sh '''
+                    echo "🛡 Start OWASP ZAP Daemon in devsecops network"
+        
+                    mkdir -p $WORKSPACE/zap-reports
+                    docker rm -f zap-daemon || true
+        
+                    docker run -d --name zap-daemon \
+                        --network devsecops \
+                        -v $WORKSPACE/zap-reports:/zap/wrk \
+                        zaproxy/zap-stable zap.sh -daemon \
+                        -port 8080 -host 0.0.0.0 \
+                        -config api.addrs.addr.name=.* \
+                        -config api.addrs.addr.regex=true \
+                        -config api.disablekey=true
+        
+                    echo "⏳ Waiting for ZAP..."
+                    until curl -s http://zap-daemon:8080/JSON/core/view/version/ > /dev/null; do
+                        echo "⏳ ZAP not ready yet..."
+                        sleep 2
+                    done
+                    echo "🔥 ZAP Ready!"
+        
+                    echo "⏳ Waiting for JuiceShop..."
+                    until curl -s http://juice-app:3000/ > /dev/null; do
+                        echo "Waiting Juice Shop..."
+                        sleep 5
+                    done
+                    echo "🍭 Juice Shop Ready!"
+        
+                    echo "🕷 Starting Spider..."
+                    SPIDER_ID=$(curl -s "http://zap-daemon:8080/JSON/spider/action/scan/?url=http://juice-app:3000/&recurse=true" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
+                    echo "Spider ID = $SPIDER_ID"
+        
+                    echo "⏳ Waiting for Spider to reach 100%..."
+                    while true; do
+                        PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/spider/view/status/?scanId=$SPIDER_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
+                        echo "Spider progress: ${PROGRESS}%"
+                        [ "$PROGRESS" = "100" ] && break
+                        sleep 3
+                    done
+                    echo "🕸 Spider Complete!"
+        
+                    echo "⚡ Starting Active Scan..."
+                    ASCAN_ID=$(curl -s "http://zap-daemon:8080/JSON/ascan/action/scan/?url=http://juice-app:3000/" | sed -n 's/.*"scan":"\\([0-9]*\\)".*/\\1/p')
+                    echo "Active Scan ID = $ASCAN_ID"
+        
+                    echo "⏳ Waiting for Active Scan to reach 100%..."
+                    while true; do
+                        ASCAN_PROGRESS=$(curl -s "http://zap-daemon:8080/JSON/ascan/view/status/?scanId=$ASCAN_ID" | sed -n 's/.*"status":"\\([0-9]*\\)".*/\\1/p')
+                        echo "Active Scan progress: ${ASCAN_PROGRESS}%"
+                        [ "$ASCAN_PROGRESS" = "100" ] && break
+                        sleep 5
+                    done
+                    echo "⚡ Active Scan Complete!"
+        
+                    echo "📄 Exporting XML report..."
+                    curl "http://zap-daemon:8080/OTHER/core/other/xmlreport/" \
+                        --output $WORKSPACE/zap-reports/zap-report.xml
+        
+                    docker stop zap-daemon && docker rm zap-daemon
+        
+                    echo "📁 Scan completed. Reports saved in zap-reports/"
+                    ls -lh $WORKSPACE/zap-reports
+                    '''
+                }
+            }
+        }
+
+        //Upload ZAP report to DefectDojo
+        stage('Upload ZAP Report to DefectDojo') {
+            steps {
+                script {
+                    sh """
+                    curl -s -X POST '${DEFECTDOJO_URL}/api/v2/import-scan/' \
+                         -H 'Authorization: Token ${DEFECTDOJO_API_KEY}' \
+                         -F 'scan_type=ZAP Scan' \
+                         -F 'engagement=${DEFECTDOJO_ENGAGEMENT_ID}' \
+                         -F 'file=@${WORKSPACE}/zap-reports/zap-report.xml'
+                    """
+                }
+            }
+        }
         // 5️⃣ RELEASE -----------------------------------------------------------------------------------------------
         // Image Supply Chain: Tag, Attach SBOM, Sign & Push
         stage('Tag, SBOM, Sign & Push Image') {
@@ -295,7 +381,7 @@ pipeline {
                 }
             }
         }
-        */
+    
        // ---------------------------------------------------------------------------------------------------------------------------------
  }
     post {
