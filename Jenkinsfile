@@ -18,9 +18,6 @@ pipeline {
 
     }
 
-      pipeline {
-    agent any
-    stages {
         stage('Announce') {
             steps {
                 script {
@@ -41,8 +38,6 @@ pipeline {
                 }
             }
         }
-    }
-}
 
     stages {  
         // 2️⃣ CODE -----------------------------------------------------------------------------------------------
