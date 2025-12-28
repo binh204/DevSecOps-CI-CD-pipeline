@@ -17,7 +17,8 @@ pipeline {
         DOCKER_CREDS = credentials('dockerhub-credential')
 
     }
-
+    
+    stage {
         stage('Announce') {
             steps {
                 script {
@@ -38,8 +39,7 @@ pipeline {
                 }
             }
         }
-
-    stages {  
+        
         // 2️⃣ CODE -----------------------------------------------------------------------------------------------
         stage('Checkout code') {
             steps {
