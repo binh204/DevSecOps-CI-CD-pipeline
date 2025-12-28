@@ -253,10 +253,10 @@ pipeline {
                         echo "🔍 Getting image digest"
                         DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$IMAGE)
         
-                        echo "🔐 Verifying image signature with Cosign"
-                        cosign verify \$DIGEST \
-                          --certificate-identity-regexp ".*" \
-                          --certificate-oidc-issuer https://github.com/login/oauth
+                        echo "🔐 Verifying IMAGE SIGNATURE"
+                        cosign verify \
+                          --key \$COSIGN_PUB_KEY \
+                          \$DIGEST
 
                         echo "📦 Verifying SBOM ATTESTATION"
                         cosign verify-attestation \
