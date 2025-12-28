@@ -18,7 +18,7 @@ pipeline {
 
     }
     
-    stage {
+    stages {
         stage('Announce') {
             steps {
                 script {
