@@ -366,6 +366,7 @@ pipeline {
                         cosign verify-attestation \
                           --key security/cosign.pub \
                           --type spdxjson \
+                          --quiet \
                          \$DIGEST
         
                         echo "🚀 Running container on Staging"
