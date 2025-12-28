@@ -253,6 +253,7 @@ pipeline {
                         echo "🔍 Getting image digest"
                         DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$IMAGE)
 
+                        unset COSIGN_KEY
                         echo "🔎 Debug public key used for verify:"
                         head -n 3 $COSIGN_PUB_KEY
                         
