@@ -250,11 +250,7 @@ pipeline {
                         docker pull \$IMAGE
         
                         echo "🔍 Getting image digest"
-                        DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$IMAGE)
-
-                        unset COSIGN_KEY_FILE
-                        echo "🔎 Debug public key used for verify:"
-                        head -n 3 $COSIGN_PUB_KEY
+                        DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' \$IMAGE)           
                         
                         echo "🔐 Verifying IMAGE SIGNATURE"
                         cosign verify \
