@@ -26,11 +26,11 @@ pipeline {
                     // Sử dụng dấu nháy đơn ba lần (''' ... ''') để tránh lỗi escape character
                     echo """
                       _   _  ______  __          __  ____    _    _  _____  _      _____  
-                     | \\ | ||  ____| \\ \\        / / |  _ \\  | |  | ||_   _|| |    |  __ \\ 
-                     |  \\| || |__     \\ \\  /\\  / /  | |_) | | |  | |  | |  | |    | |  | |
+                     | \\ | ||  ____| \\ \\        / / |  _ \\ | |  | ||_   _|| |    |  __ \\ 
+                     |  \\| || |__     \\ \\  /\\  / / | |_) | | |  | |  | |  | |    | |  | |
                      | . ` ||  __|     \\ \\/  \\/ /   |  _ <  | |  | |  | |  | |    | |  | |
                      | |\\  || |____     \\  /\\  /    | |_) | | |__| | _| |_ | |____| |__| |
-                     |_| \\_||______|     \\/  \\/     |____/   \\____/ |_____||______|_____/ 
+                     |_| \\_||______|     \\/  \\/     |____/  \\____/ |_____||______|_____/ 
                     >>> CURRENT BUILD NUMBER: #${buildNum} <<<
                     """
                 }
@@ -83,7 +83,7 @@ pipeline {
         // Quality Gate
         stage('Quality Gate') {
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                
                     script {
                         timeout(time: 8, unit: 'MINUTES') {
                             def qg = waitForQualityGate()
@@ -95,7 +95,7 @@ pipeline {
                     }
                 }
             }
-        }
+        
 /*
         // Upload Sonar report to DefectDojo
          stage('Upload Sonar Report to DefectDojo') {
